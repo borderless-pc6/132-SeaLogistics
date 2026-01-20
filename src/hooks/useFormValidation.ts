@@ -7,7 +7,7 @@ export interface ValidationError {
 
 export interface UseFormValidationReturn<T> {
   errors: ValidationError;
-  validateField: (fieldName: keyof T, value: any) => boolean;
+  validateField: (fieldName: keyof T, value: any, fullData?: Partial<T>) => boolean;
   validateForm: (data: T) => boolean;
   clearError: (fieldName: keyof T) => void;
   clearAllErrors: () => void;
@@ -37,13 +37,16 @@ export function useFormValidation<T extends Record<string, any>>(
    * Valida um campo específico
    */
   const validateField = useCallback(
-    (fieldName: keyof T, value: any): boolean => {
+    (fieldName: keyof T, value: any, fullData?: Partial<T>): boolean => {
       try {
-        // Cria um objeto parcial para validar apenas o campo específico
-        const partialData = { [fieldName]: value } as Partial<T>;
+        // Para schemas que dependem de outros campos (como discriminatedUnion),
+        // precisamos passar os dados completos se disponíveis
+        const dataToValidate = fullData 
+          ? { ...fullData, [fieldName]: value } as Partial<T>
+          : { [fieldName]: value } as Partial<T>;
         
         // Tenta validar usando safeParse
-        const result = schema.safeParse(partialData as T);
+        const result = schema.safeParse(dataToValidate as T);
         
         if (result.success) {
           // Se passou, remove o erro
@@ -56,7 +59,7 @@ export function useFormValidation<T extends Record<string, any>>(
         } else {
           // Procura por erros específicos deste campo
           const fieldError = result.error.errors.find(
-            (err) => err.path[0] === fieldName
+            (err) => err.path[0] === fieldName || err.path.join('.') === String(fieldName)
           );
           
           if (fieldError) {
@@ -76,15 +79,10 @@ export function useFormValidation<T extends Record<string, any>>(
           return true;
         }
       } catch (error) {
-        if (error instanceof z.ZodError) {
-          const errorMessage = error.errors[0]?.message || 'Campo inválido';
-          setErrors((prev) => ({
-            ...prev,
-            [fieldName]: errorMessage,
-          }));
-          return false;
-        }
-        return false;
+        // Se houver erro ao validar (ex: schema precisa de campos que não temos),
+        // apenas retorna true para não bloquear o usuário
+        // A validação completa será feita no submit
+        return true;
       }
     },
     [schema]

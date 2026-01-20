@@ -273,7 +273,8 @@ const NovoEnvioPage = () => {
   // Handler para validar campo quando perde o foco
   const handleBlur = (field: keyof NovoEnvio) => {
     if (formData.tipo) { // Só valida se o tipo já foi selecionado
-      validateField(field, formData[field]);
+      // Passa os dados completos para validação (necessário para discriminatedUnion)
+      validateField(field, formData[field], formData);
     }
   };
 
