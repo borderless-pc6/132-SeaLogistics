@@ -26,9 +26,15 @@ const ExcelSync: React.FC<ExcelSyncProps> = ({
   const [syncInterval, setSyncInterval] = useState<NodeJS.Timeout | null>(null);
   const [excelData, setExcelData] = useState<any[]>([]);
   const [isSavingToDb, setIsSavingToDb] = useState(false);
+  const [syncIntervalSeconds, setSyncIntervalSeconds] = useState<number>(30);
+  const [syncProgress, setSyncProgress] = useState<{
+    current: number;
+    total: number;
+  } | null>(null);
   const { addShipment, deleteAllShipments } = useShipments();
 
   const performSyncRef = useRef<any>(null);
+  const debounceTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 
   useEffect(() => {
     if (config) {
@@ -45,27 +51,16 @@ const ExcelSync: React.FC<ExcelSyncProps> = ({
     performSyncRef.current = performSync;
   });
 
-  useEffect(() => {
-    if (isConnected && !autoSync) {
-      console.log("[v0] Auto-starting sync due to active connection");
-
-      performSyncRef.current();
-
-      const interval = setInterval(() => {
-        performSyncRef.current();
-      }, 30000);
-
-      setSyncInterval(interval);
-      setAutoSync(true);
-      setSyncStatus("Sincronização automática ativada (30s)");
-    }
-  }, [isConnected]);
+  // Não inicia auto-sync automaticamente - usuário deve ativar manualmente
+  // useEffect removido para dar controle ao usuário
 
   const checkConnection = async () => {
     if (!config) return;
 
     try {
-      // Verifica se consegue acessar a tabela
+      setSyncStatus("Verificando conexão...");
+      setError("");
+
       if (config.tableName === "default_table") {
         await excelService.getWorksheetDataDirect(
           config.workbookId,
@@ -80,42 +75,67 @@ const ExcelSync: React.FC<ExcelSyncProps> = ({
       }
       setIsConnected(true);
       setError("");
-    } catch (error) {
+      setSyncStatus("Conexão verificada com sucesso");
+    } catch (error: any) {
       console.error("Erro na verificação de conexão:", error);
       setIsConnected(false);
-      setError(
-        "Erro na conexão com Excel - arquivo não encontrado ou sem permissão"
-      );
+
+      const errorMessage =
+        error?.userMessage ||
+        error?.message ||
+        "Erro na conexão com Excel - arquivo não encontrado ou sem permissão";
+      setError(errorMessage);
+      setSyncStatus("Erro na verificação de conexão");
     }
   };
 
+  // Debounce para evitar múltiplas sincronizações simultâneas
+  const performSyncDebounced = () => {
+    if (debounceTimeoutRef.current) {
+      clearTimeout(debounceTimeoutRef.current);
+    }
+
+    debounceTimeoutRef.current = setTimeout(() => {
+      performSync();
+    }, 500);
+  };
+
   const performSync = async () => {
-    if (!config || isSyncing) return;
+    if (!config || isSyncing) {
+      console.log("Sincronização ignorada: config ausente ou já sincronizando");
+      return;
+    }
 
     setIsSyncing(true);
     setSyncStatus("Sincronizando...");
     setError("");
+    setSyncProgress(null);
 
     try {
-      // Obtém dados do Excel
       const excelDataResult = await excelService.getShipmentsFromExcel(config);
       console.log("Dados obtidos do Excel:", excelDataResult);
 
       setExcelData(excelDataResult);
 
-      // Atualiza dados no sistema
       onDataUpdate(excelDataResult);
 
       setLastSync(new Date());
       setSyncStatus(
-        `Sincronizado com sucesso - ${excelDataResult.length} registros`
+        `✅ Sincronizado com sucesso - ${excelDataResult.length} registros`
       );
       setIsConnected(true);
-    } catch (error) {
+      setSyncProgress(null);
+    } catch (error: any) {
       console.error("Erro na sincronização:", error);
-      setError("Erro na sincronização com Excel");
-      setSyncStatus("Erro na sincronização");
+
+      const errorMessage =
+        error?.userMessage ||
+        error?.message ||
+        "Erro na sincronização com Excel";
+      setError(errorMessage);
+      setSyncStatus("❌ Erro na sincronização");
       setIsConnected(false);
+      setSyncProgress(null);
     } finally {
       setIsSyncing(false);
     }
@@ -228,7 +248,6 @@ const ExcelSync: React.FC<ExcelSyncProps> = ({
 
   const toggleAutoSync = () => {
     if (autoSync) {
-      // Para sincronização automática
       if (syncInterval) {
         clearInterval(syncInterval);
         setSyncInterval(null);
@@ -236,17 +255,43 @@ const ExcelSync: React.FC<ExcelSyncProps> = ({
       setAutoSync(false);
       setSyncStatus("Sincronização automática desabilitada");
     } else {
-      // Inicia sincronização automática (a cada 30 segundos)
+      if (!isConnected) {
+        setError("Conecte-se ao Excel primeiro antes de ativar auto-sync");
+        return;
+      }
+
+      const intervalMs = syncIntervalSeconds * 1000;
       const interval = setInterval(() => {
-        performSyncRef.current();
-      }, 30000);
+        if (performSyncRef.current) {
+          performSyncRef.current();
+        }
+      }, intervalMs);
 
       setSyncInterval(interval);
       setAutoSync(true);
-      setSyncStatus("Sincronização automática ativada (30s)");
+      setSyncStatus(
+        `Sincronização automática ativada (${syncIntervalSeconds}s)`
+      );
 
-      // Faz primeira sincronização imediatamente
-      performSyncRef.current();
+      if (performSyncRef.current) {
+        performSyncRef.current();
+      }
+    }
+  };
+
+  const handleIntervalChange = (seconds: number) => {
+    const validInterval = Math.max(10, Math.min(300, seconds));
+    setSyncIntervalSeconds(validInterval);
+
+    if (autoSync && syncInterval) {
+      clearInterval(syncInterval);
+      const newInterval = setInterval(() => {
+        if (performSyncRef.current) {
+          performSyncRef.current();
+        }
+      }, validInterval * 1000);
+      setSyncInterval(newInterval);
+      setSyncStatus(`Sincronização automática atualizada (${validInterval}s)`);
     }
   };
 
@@ -359,15 +404,38 @@ const ExcelSync: React.FC<ExcelSyncProps> = ({
       {syncStatus && (
         <div className={`sync-status ${error ? "error" : "success"}`}>
           {syncStatus}
+          {syncProgress && (
+            <div style={{ marginTop: "8px", fontSize: "12px", opacity: 0.8 }}>
+              Progresso: {syncProgress.current} / {syncProgress.total}
+            </div>
+          )}
         </div>
       )}
 
-      {error && <div className="error-message">{error}</div>}
+      {error && (
+        <div className="error-message">
+          <strong>Erro:</strong> {error}
+          <button
+            onClick={() => setError("")}
+            style={{
+              marginLeft: "12px",
+              padding: "4px 8px",
+              fontSize: "12px",
+              background: "transparent",
+              border: "1px solid currentColor",
+              borderRadius: "4px",
+              cursor: "pointer",
+            }}
+          >
+            Fechar
+          </button>
+        </div>
+      )}
 
       <div className="excel-sync-actions">
         <button
           className="sync-button primary"
-          onClick={performSync}
+          onClick={performSyncDebounced}
           disabled={isSyncing || !isConnected}
         >
           {isSyncing ? (
@@ -429,14 +497,49 @@ const ExcelSync: React.FC<ExcelSyncProps> = ({
           )}
         </button>
 
-        <button
-          className={`sync-button ${autoSync ? "active" : "secondary"}`}
-          onClick={toggleAutoSync}
-          disabled={isSyncing || !isConnected}
+        <div
+          style={{
+            display: "flex",
+            gap: "8px",
+            alignItems: "center",
+            flexWrap: "wrap",
+          }}
         >
-          <span>{autoSync ? "⏸️" : "▶️"}</span>
-          {autoSync ? "Parar Auto Sync" : "Auto Sync"}
-        </button>
+          <button
+            className={`sync-button ${autoSync ? "active" : "secondary"}`}
+            onClick={toggleAutoSync}
+            disabled={isSyncing || !isConnected}
+          >
+            <span>{autoSync ? "⏸️" : "▶️"}</span>
+            {autoSync ? "Parar Auto Sync" : "Auto Sync"}
+          </button>
+
+          {autoSync && (
+            <div style={{ display: "flex", gap: "8px", alignItems: "center" }}>
+              <label style={{ fontSize: "12px", color: "#6b7280" }}>
+                Intervalo:
+              </label>
+              <input
+                type="number"
+                min="10"
+                max="300"
+                value={syncIntervalSeconds}
+                onChange={(e) =>
+                  handleIntervalChange(parseInt(e.target.value, 10) || 30)
+                }
+                style={{
+                  width: "60px",
+                  padding: "6px 8px",
+                  border: "1px solid #d1d5db",
+                  borderRadius: "4px",
+                  fontSize: "12px",
+                }}
+                disabled={isSyncing}
+              />
+              <span style={{ fontSize: "12px", color: "#6b7280" }}>seg</span>
+            </div>
+          )}
+        </div>
 
         <button
           className="sync-button secondary"

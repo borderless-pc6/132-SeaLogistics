@@ -6,6 +6,7 @@ import { AdminRoute, PrivateRoute } from "../components/protected-route";
 import { AuthProvider } from "../context/auth-context";
 import { LanguageProvider } from "../context/language-context";
 import { ShipmentsProvider } from "../context/shipments-context";
+import { ToastProvider } from "../context/toast-context";
 import ExcelCallback from "../pages/auth/excel-callback";
 import { AdminDashboard } from "../pages/dashboard/admin-dashboard";
 import { Dashboard } from "../pages/dashboard/dashboard";
@@ -20,9 +21,10 @@ import { Settings } from "../pages/settings/Settings";
 export const App = () => {
   return (
     <LanguageProvider>
-      <AuthProvider>
-        <ShipmentsProvider>
-          <NavbarProvider>
+      <ToastProvider>
+        <AuthProvider>
+          <ShipmentsProvider>
+            <NavbarProvider>
             <Router
               future={{ v7_startTransition: true, v7_relativeSplatPath: true }}
             >
@@ -117,9 +119,10 @@ export const App = () => {
                 <Footer theme="light" />
               </div>
             </Router>
-          </NavbarProvider>
-        </ShipmentsProvider>
-      </AuthProvider>
+            </NavbarProvider>
+          </ShipmentsProvider>
+        </AuthProvider>
+      </ToastProvider>
     </LanguageProvider>
   );
 };

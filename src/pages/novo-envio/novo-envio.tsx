@@ -4,14 +4,17 @@ import type React from "react";
 
 import { collection, getDocs, query, where } from "firebase/firestore";
 import { FileText, MapPin, Package, User } from "lucide-react";
-import { useContext, useEffect, useState } from "react";
+import { useContext, useEffect, useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import Navbar from "../../components/navbar/navbar";
 import { NavbarContext } from "../../components/navbar/navbar-context";
 import { useAuth } from "../../context/auth-context";
 import { useLanguage } from "../../context/language-context";
 import { useShipments } from "../../context/shipments-context";
+import { useToast } from "../../context/toast-context";
+import { useFormValidation } from "../../hooks/useFormValidation";
 import { db } from "../../lib/firebaseConfig";
+import { getShipmentSchema } from "../../schemas/shipmentSchema";
 import { UserRole } from "../../types/user";
 import "./novo-envio.css";
 
@@ -52,6 +55,7 @@ const NovoEnvioPage = () => {
   const { currentUser, isAdmin } = useAuth();
   const { isCollapsed } = useContext(NavbarContext);
   const { translations } = useLanguage();
+  const { showError, showSuccess } = useToast();
 
   useEffect(() => {
     const isAdminUser = isAdmin();
@@ -87,6 +91,12 @@ const NovoEnvioPage = () => {
   const [loadingClientes, setLoadingClientes] = useState(false);
   const [loadingOperadores, setLoadingOperadores] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
+
+  // Schema dinâmico baseado no tipo de transporte
+  const shipmentSchema = useMemo(() => getShipmentSchema(formData.tipo), [formData.tipo]);
+
+  // Hook de validação
+  const { errors, validateForm, validateField, clearAllErrors } = useFormValidation(shipmentSchema);
 
   // Limpar campos de origem e destino quando o tipo de transporte for alterado
   useEffect(() => {
@@ -260,6 +270,13 @@ const NovoEnvioPage = () => {
     }));
   };
 
+  // Handler para validar campo quando perde o foco
+  const handleBlur = (field: keyof NovoEnvio) => {
+    if (formData.tipo) { // Só valida se o tipo já foi selecionado
+      validateField(field, formData[field]);
+    }
+  };
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
 
@@ -267,7 +284,13 @@ const NovoEnvioPage = () => {
     const isCompanyUser = currentUser?.role === UserRole.COMPANY_USER;
 
     if (!isAdminUser && !isCompanyUser) {
-      alert("Erro: Você não tem permissão para criar shipments.");
+      showError("Erro: Você não tem permissão para criar shipments.");
+      return;
+    }
+
+    // Validar formulário completo
+    if (!validateForm(formData)) {
+      showError('Por favor, corrija os erros no formulário antes de continuar');
       return;
     }
 
@@ -279,7 +302,7 @@ const NovoEnvioPage = () => {
       );
 
       if (!clienteSelecionado) {
-        alert(translations.pleaseSelectValidClient);
+        showError(translations.pleaseSelectValidClient);
         setIsSubmitting(false);
         return;
       }
@@ -305,7 +328,8 @@ const NovoEnvioPage = () => {
 
       await addShipment(shipmentData);
 
-      alert("Envio registrado com sucesso!");
+      showSuccess("Envio registrado com sucesso!");
+      clearAllErrors();
 
       setFormData({
         clienteId: "",
@@ -327,7 +351,7 @@ const NovoEnvioPage = () => {
       navigate("/home");
     } catch (error) {
       console.error("Erro ao criar shipment:", error);
-      alert("Erro ao criar shipment. Tente novamente.");
+      showError("Erro ao criar shipment. Tente novamente.");
     } finally {
       setIsSubmitting(false);
     }
@@ -394,6 +418,8 @@ const NovoEnvioPage = () => {
                 name="tipo"
                 value={formData.tipo}
                 onChange={handleInputChange}
+                onBlur={() => handleBlur('tipo')}
+                className={errors.tipo ? 'input-error' : ''}
                 required
               >
                 <option value="">Selecione o tipo de transporte</option>
@@ -401,6 +427,7 @@ const NovoEnvioPage = () => {
                 <option value="Aéreo">Aéreo</option>
                 <option value="Terrestre">Terrestre</option>
               </select>
+              {errors.tipo && <span className="error-text">{errors.tipo}</span>}
             </div>
           </div>
         </div>
@@ -462,6 +489,8 @@ const NovoEnvioPage = () => {
                     name="operador"
                     value={formData.operador}
                     onChange={handleInputChange}
+                    onBlur={() => handleBlur('operador')}
+                    className={errors.operador ? 'input-error' : ''}
                     required
                     disabled={loadingOperadores}
                   >
@@ -476,6 +505,7 @@ const NovoEnvioPage = () => {
                       </option>
                     ))}
                   </select>
+                  {errors.operador && <span className="error-text">{errors.operador}</span>}
                 </div>
               </div>
             </div>
@@ -502,6 +532,8 @@ const NovoEnvioPage = () => {
                     name="pol"
                     value={formData.pol}
                     onChange={handleInputChange}
+                    onBlur={() => handleBlur('pol')}
+                    className={errors.pol ? 'input-error' : ''}
                     required
                   >
                     <option value="">
@@ -529,6 +561,7 @@ const NovoEnvioPage = () => {
                           </option>
                         ))}
                   </select>
+                  {errors.pol && <span className="error-text">{errors.pol}</span>}
                 </div>
 
                 <div className="form-group">
@@ -545,6 +578,8 @@ const NovoEnvioPage = () => {
                     name="pod"
                     value={formData.pod}
                     onChange={handleInputChange}
+                    onBlur={() => handleBlur('pod')}
+                    className={errors.pod ? 'input-error' : ''}
                     required
                   >
                     <option value="">
@@ -572,6 +607,7 @@ const NovoEnvioPage = () => {
                           </option>
                         ))}
                   </select>
+                  {errors.pod && <span className="error-text">{errors.pod}</span>}
                 </div>
               </div>
 
@@ -584,8 +620,11 @@ const NovoEnvioPage = () => {
                     name="etdOrigem"
                     value={formData.etdOrigem}
                     onChange={handleInputChange}
+                    onBlur={() => handleBlur('etdOrigem')}
+                    className={errors.etdOrigem ? 'input-error' : ''}
                     required
                   />
+                  {errors.etdOrigem && <span className="error-text">{errors.etdOrigem}</span>}
                 </div>
 
                 <div className="form-group">
@@ -598,8 +637,11 @@ const NovoEnvioPage = () => {
                     name="etaDestino"
                     value={formData.etaDestino}
                     onChange={handleInputChange}
+                    onBlur={() => handleBlur('etaDestino')}
+                    className={errors.etaDestino ? 'input-error' : ''}
                     required
                   />
+                  {errors.etaDestino && <span className="error-text">{errors.etaDestino}</span>}
                 </div>
               </div>
             </div>
@@ -613,20 +655,23 @@ const NovoEnvioPage = () => {
 
               <div className="form-row">
                 <div className="form-group">
-                  <label htmlFor="numeroBl">Número do BL *</label>
+                  <label htmlFor="numeroBl">Número do BL {formData.tipo === "Marítimo" && "*"}</label>
                   <input
                     type="text"
                     id="numeroBl"
                     name="numeroBl"
                     value={formData.numeroBl}
                     onChange={handleInputChange}
+                    onBlur={() => handleBlur('numeroBl')}
                     placeholder="Ex: BL123456789"
-                    required
+                    className={errors.numeroBl ? 'input-error' : ''}
+                    required={formData.tipo === "Marítimo"}
                   />
+                  {errors.numeroBl && <span className="error-text">{errors.numeroBl}</span>}
                 </div>
 
                 <div className="form-group">
-                  <label htmlFor="booking">Número do Booking *</label>
+                  <label htmlFor="booking">Número do Booking {formData.tipo === "Aéreo" && "*"}</label>
                   <input
                     type="text"
                     id="booking"

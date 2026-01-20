@@ -1,21 +1,35 @@
 "use client";
 
 import { doc, getDoc, updateDoc } from "firebase/firestore";
-import { Bell, Globe, Save, User } from "lucide-react";
+import { Bell, Globe, MessageCircle, Save, User } from "lucide-react";
 import { useContext, useEffect, useState } from "react";
 import ChatAssistant from "../../components/chat-assistant/chat-assistant";
 import Navbar from "../../components/navbar/navbar";
 import { NavbarContext } from "../../components/navbar/navbar-context";
+import { useAuth } from "../../context/auth-context";
 import { LanguageProvider } from "../../context/language-context";
+import { useToast } from "../../context/toast-context";
 import { db } from "../../lib/firebaseConfig";
 import type { UserSettings } from "../../types/user";
+import { UserRole } from "../../types/user";
 import "./Settings.css";
 
 export const Settings = () => {
   const { isCollapsed } = useContext(NavbarContext);
+  const { currentUser: authUser, isCompanyUser } = useAuth();
+  const { showToast } = useToast();
 
-  // Obter dados do usuário logado do localStorage
+  // Obter dados do usuário logado
   const getCurrentUser = () => {
+    if (authUser) {
+      return {
+        id: authUser.uid,
+        email: authUser.email,
+        name: authUser.displayName || "Usuário",
+        role: authUser.role,
+      };
+    }
+    
     const userData = localStorage.getItem("currentUser");
     return userData
       ? JSON.parse(userData)
@@ -33,10 +47,12 @@ export const Settings = () => {
     name: "",
     email: "",
     phone: "",
+    whatsappPhone: "",
     company: "",
     position: "",
     notifications: {
       email: true,
+      whatsapp: false,
       push: true,
       statusUpdates: true,
       newShipments: true,
@@ -66,6 +82,7 @@ export const Settings = () => {
           name: userData.name || currentUser.name || "",
           email: userData.email || currentUser.email || "",
           phone: userData.phone || "",
+          whatsappPhone: userData.whatsappPhone || userData.phone || "",
           company: userData.company || "",
           position: userData.position || "",
           notifications: userData.notifications || userSettings.notifications,
@@ -118,10 +135,38 @@ export const Settings = () => {
     }
   };
 
+  // Função para formatar telefone brasileiro
+  const formatPhone = (value: string): string => {
+    // Remove tudo que não é número
+    const numbers = value.replace(/\D/g, '');
+    
+    // Limita a 11 dígitos
+    const limited = numbers.slice(0, 11);
+    
+    // Aplica a máscara
+    if (limited.length <= 2) {
+      return limited;
+    } else if (limited.length <= 6) {
+      return `(${limited.slice(0, 2)}) ${limited.slice(2)}`;
+    } else if (limited.length <= 10) {
+      return `(${limited.slice(0, 2)}) ${limited.slice(2, 6)}-${limited.slice(6)}`;
+    } else {
+      return `(${limited.slice(0, 2)}) ${limited.slice(2, 7)}-${limited.slice(7)}`;
+    }
+  };
+
   const handleInputChange = (field: string, value: string) => {
     setUserSettings((prev) => ({
       ...prev,
       [field]: value,
+    }));
+  };
+
+  const handlePhoneChange = (field: string, value: string) => {
+    const formatted = formatPhone(value);
+    setUserSettings((prev) => ({
+      ...prev,
+      [field]: formatted,
     }));
   };
 
@@ -147,17 +192,24 @@ export const Settings = () => {
         name: userSettings.name,
         email: userSettings.email,
         phone: userSettings.phone,
+        whatsappPhone: userSettings.whatsappPhone,
         company: userSettings.company,
         position: userSettings.position,
         notifications: userSettings.notifications,
         preferences: userSettings.preferences,
+        notificationPreferences: {
+          email: userSettings.notifications.email,
+          whatsapp: userSettings.notifications.whatsapp,
+          statusUpdates: userSettings.notifications.statusUpdates,
+          newShipments: userSettings.notifications.newShipments,
+        },
         updatedAt: new Date(),
       });
 
-      alert("Configurações salvas com sucesso!");
+      showToast("Configurações salvas com sucesso!", "success");
     } catch (error) {
       console.error("Erro ao salvar configurações:", error);
-      alert("Erro ao salvar configurações. Tente novamente.");
+      showToast("Erro ao salvar configurações. Tente novamente.", "error");
     } finally {
       setIsSaving(false);
     }
@@ -239,11 +291,37 @@ export const Settings = () => {
                       id="phone"
                       value={userSettings.phone}
                       onChange={(e) =>
-                        handleInputChange("phone", e.target.value)
+                        handlePhoneChange("phone", e.target.value)
                       }
                       placeholder="(11) 99999-9999"
+                      maxLength={15}
                     />
                   </div>
+
+                  {/* Campo WhatsApp apenas para COMPANY_USER */}
+                  {currentUser.role === UserRole.COMPANY_USER && (
+                    <div className="form-group">
+                      <label htmlFor="whatsappPhone">
+                        WhatsApp{" "}
+                        <span style={{ fontSize: "0.85rem", color: "#888" }}>
+                          (para notificações)
+                        </span>
+                      </label>
+                      <input
+                        type="tel"
+                        id="whatsappPhone"
+                        value={userSettings.whatsappPhone}
+                        onChange={(e) =>
+                          handlePhoneChange("whatsappPhone", e.target.value)
+                        }
+                        placeholder="(11) 99999-9999"
+                        maxLength={15}
+                      />
+                      <small style={{ color: "#666", fontSize: "0.85rem" }}>
+                        Formato: (DD) 9XXXX-XXXX ou (DD) XXXXX-XXXX
+                      </small>
+                    </div>
+                  )}
 
                   <div className="form-group">
                     <label htmlFor="company">Empresa</label>
@@ -280,48 +358,149 @@ export const Settings = () => {
                   <h2>Notificações</h2>
                 </div>
 
-                <div className="notification-settings">
-                  <div className="notification-item">
-                    <div className="notification-info">
-                      <h3>Notificações por E-mail</h3>
-                      <p>Receba atualizações importantes por e-mail</p>
+                {/* Canais de Notificação - apenas para COMPANY_USER */}
+                {currentUser.role === UserRole.COMPANY_USER && (
+                  <>
+                    <div style={{ marginBottom: "1.5rem" }}>
+                      <h3
+                        style={{
+                          fontSize: "1rem",
+                          color: "#2c3e50",
+                          marginBottom: "0.75rem",
+                          fontWeight: 600,
+                        }}
+                      >
+                        Canais de Notificação
+                      </h3>
+                      <p
+                        style={{
+                          fontSize: "0.9rem",
+                          color: "#7f8c8d",
+                          marginBottom: "1rem",
+                        }}
+                      >
+                        Escolha como deseja receber notificações sobre seus
+                        envios
+                      </p>
                     </div>
-                    <label className="switch">
-                      <input
-                        type="checkbox"
-                        checked={userSettings.notifications.email}
-                        onChange={(e) =>
-                          handleNestedChange(
-                            "notifications",
-                            "email",
-                            e.target.checked
-                          )
-                        }
-                      />
-                      <span className="slider"></span>
-                    </label>
-                  </div>
 
-                  <div className="notification-item">
-                    <div className="notification-info">
-                      <h3>Notificações Push</h3>
-                      <p>Receba notificações em tempo real no navegador</p>
+                    <div className="notification-settings">
+                      <div className="notification-item">
+                        <div className="notification-info">
+                          <h3>📧 Notificações por E-mail</h3>
+                          <p>Receba atualizações importantes por e-mail</p>
+                        </div>
+                        <label className="switch">
+                          <input
+                            type="checkbox"
+                            checked={userSettings.notifications.email}
+                            onChange={(e) =>
+                              handleNestedChange(
+                                "notifications",
+                                "email",
+                                e.target.checked
+                              )
+                            }
+                          />
+                          <span className="slider"></span>
+                        </label>
+                      </div>
+
+                      <div className="notification-item">
+                        <div className="notification-info">
+                          <h3 style={{ display: "flex", alignItems: "center", gap: "0.5rem" }}>
+                            <MessageCircle size={18} />
+                            Notificações por WhatsApp
+                          </h3>
+                          <p>
+                            Receba atualizações em tempo real no WhatsApp
+                            {!userSettings.whatsappPhone && (
+                              <span style={{ color: "#e74c3c", marginLeft: "0.5rem" }}>
+                                (configure seu número acima)
+                              </span>
+                            )}
+                          </p>
+                        </div>
+                        <label className="switch">
+                          <input
+                            type="checkbox"
+                            checked={userSettings.notifications.whatsapp}
+                            onChange={(e) =>
+                              handleNestedChange(
+                                "notifications",
+                                "whatsapp",
+                                e.target.checked
+                              )
+                            }
+                            disabled={!userSettings.whatsappPhone}
+                          />
+                          <span className="slider"></span>
+                        </label>
+                      </div>
                     </div>
-                    <label className="switch">
-                      <input
-                        type="checkbox"
-                        checked={userSettings.notifications.push}
-                        onChange={(e) =>
-                          handleNestedChange(
-                            "notifications",
-                            "push",
-                            e.target.checked
-                          )
-                        }
-                      />
-                      <span className="slider"></span>
-                    </label>
-                  </div>
+
+                    <div style={{ marginTop: "2rem", marginBottom: "1rem" }}>
+                      <h3
+                        style={{
+                          fontSize: "1rem",
+                          color: "#2c3e50",
+                          marginBottom: "0.75rem",
+                          fontWeight: 600,
+                        }}
+                      >
+                        Tipos de Notificação
+                      </h3>
+                    </div>
+                  </>
+                )}
+
+                <div className="notification-settings">
+                  {/* Push apenas para admin */}
+                  {currentUser.role !== UserRole.COMPANY_USER && (
+                    <>
+                      <div className="notification-item">
+                        <div className="notification-info">
+                          <h3>Notificações por E-mail</h3>
+                          <p>Receba atualizações importantes por e-mail</p>
+                        </div>
+                        <label className="switch">
+                          <input
+                            type="checkbox"
+                            checked={userSettings.notifications.email}
+                            onChange={(e) =>
+                              handleNestedChange(
+                                "notifications",
+                                "email",
+                                e.target.checked
+                              )
+                            }
+                          />
+                          <span className="slider"></span>
+                        </label>
+                      </div>
+
+                      <div className="notification-item">
+                        <div className="notification-info">
+                          <h3>Notificações Push</h3>
+                          <p>Receba notificações em tempo real no navegador</p>
+                        </div>
+                        <label className="switch">
+                          <input
+                            type="checkbox"
+                            checked={userSettings.notifications.push}
+                            onChange={(e) =>
+                              handleNestedChange(
+                                "notifications",
+                                "push",
+                                e.target.checked
+                              )
+                            }
+                          />
+                          <span className="slider"></span>
+                        </label>
+                      </div>
+                    </>
+                  )}
 
                   <div className="notification-item">
                     <div className="notification-info">

@@ -4,8 +4,10 @@ import { useMemo, useState } from "react";
 
 import { useNavigate } from "react-router-dom";
 import { useAuth } from "../../context/auth-context";
+import { useToast } from "../../context/toast-context";
 import { createLoginSchema } from "../../schemas/loginSchema";
 import type { userForm } from "../../types/user";
+import { mapAuthError, logAuthError } from "../../utils/authErrorHandler";
 import logo from "./../../assets/logo.png";
 import { useLanguage } from "./../../context/language-context";
 import "./login-form.css";
@@ -20,8 +22,10 @@ export default function LoginForm() {
     password?: string;
   }>({});
   const [isLoggingIn, setIsLoggingIn] = useState(false);
+  const [loginStep, setLoginStep] = useState<string>("");
   const { translations } = useLanguage();
   const { login } = useAuth();
+  const { showError, showSuccess } = useToast();
   const navigate = useNavigate();
 
   const loginSchema = useMemo(() => {
@@ -46,20 +50,35 @@ export default function LoginForm() {
 
     setFormErrors({});
     setIsLoggingIn(true);
+    setLoginStep("Verificando credenciais...");
 
     try {
+      setLoginStep("Autenticando...");
       await login(user.email, user.password);
+      
+      setLoginStep("Carregando dados do usuário...");
+      
+      showSuccess("Login realizado com sucesso!");
       console.log("Usuario logado com sucesso");
-      navigate("/home");
+      
+      // Pequeno delay para mostrar mensagem de sucesso
+      setTimeout(() => {
+        navigate("/home");
+      }, 500);
     } catch (err: unknown) {
       console.error("Erro ao logar:", err);
-      const errorMessage =
-        err instanceof Error
-          ? err.message
-          : "Erro ao fazer login. Verifique suas credenciais.";
-      alert(errorMessage);
+      logAuthError(err, "login");
+      
+      const authError = mapAuthError(err);
+      showError(authError.userMessage);
+      
+      setFormErrors({
+        email: authError.type === 'credentials' ? authError.userMessage : undefined,
+        password: authError.type === 'credentials' ? authError.userMessage : undefined,
+      });
     } finally {
       setIsLoggingIn(false);
+      setLoginStep("");
     }
   };
 
@@ -101,8 +120,21 @@ export default function LoginForm() {
         </div>
 
         <button type="submit" className="login-button" disabled={isLoggingIn}>
-          {isLoggingIn ? "Entrando..." : translations.loginButton}
+          {isLoggingIn ? (
+            <div className="login-button-content">
+              <div className="login-spinner"></div>
+              <span>{loginStep || "Entrando..."}</span>
+            </div>
+          ) : (
+            translations.loginButton
+          )}
         </button>
+        
+        {isLoggingIn && loginStep && (
+          <div className="login-progress">
+            <p className="login-progress-text">{loginStep}</p>
+          </div>
+        )}
       </form>
       <div className="register-link">
         {translations.dontHaveAccount}

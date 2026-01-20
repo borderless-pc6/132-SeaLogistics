@@ -36,19 +36,30 @@ export interface User {
   role: UserRole;
   companyId?: string; // Para usuários de empresa
   companyName?: string; // Cache do nome da empresa
+  phone?: string; // Telefone/WhatsApp do usuário
   isActive: boolean;
   createdAt: Date;
   lastLogin?: Date;
+  notificationPreferences?: NotificationPreferences; // Preferências de notificação
+}
+
+export interface NotificationPreferences {
+  email: boolean; // Receber notificações por email
+  whatsapp: boolean; // Receber notificações por WhatsApp
+  statusUpdates: boolean; // Notificar mudanças de status
+  newShipments: boolean; // Notificar novos envios
 }
 
 export interface UserSettings {
   name: string;
   email: string;
   phone: string;
+  whatsappPhone?: string; // Número de WhatsApp (pode ser diferente do telefone)
   company: string;
   position: string;
   notifications: {
     email: boolean;
+    whatsapp: boolean; // Notificações via WhatsApp
     push: boolean;
     statusUpdates: boolean;
     newShipments: boolean;

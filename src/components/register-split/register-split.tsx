@@ -12,10 +12,13 @@ import {
 } from "firebase/firestore";
 import { useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
+import { useFormValidation } from "../../hooks/useFormValidation";
 import { useLanguage } from "../../context/language-context";
+import { useToast } from "../../context/toast-context";
 import { db } from "../../lib/firebaseConfig";
 import { createRegisterSchema } from "../../schemas/registerSchema";
 import { type userCredentials, UserRole } from "../../types/user";
+import { PasswordStrengthIndicator } from "../password-strength-indicator";
 import LanguageSwitcher from "../language-switcher/language-switcher";
 import logo2 from "./../../assets/logo2.png";
 import "./register-split.css";
@@ -30,22 +33,18 @@ export default function RegisterSplit() {
     companyCode: "",
     role: UserRole.COMPANY_USER,
   });
-  const [formErrors, setFormErrors] = useState<{
-    name?: string;
-    email?: string;
-    password?: string;
-    confirmPassword?: string;
-    companyName?: string;
-    companyCode?: string;
-  }>({});
   const [isCreatingAdmin, setIsCreatingAdmin] = useState(false);
 
   const { translations } = useLanguage();
+  const { showError, showSuccess } = useToast();
   const navigate = useNavigate();
+  
   const registerSchema = useMemo(
     () => createRegisterSchema(translations),
     [translations]
   );
+
+  const { errors, validateForm, validateField, clearAllErrors } = useFormValidation(registerSchema);
 
   const findOrCreateCompany = async (
     companyName: string,
@@ -96,36 +95,11 @@ export default function RegisterSplit() {
       role,
     } = userCredentials;
 
-    console.log(userCredentials);
-
-    if (password !== confirmPassword) {
-      alert("As senhas não coincidem.");
+    // Validar formulário completo
+    if (!validateForm(userCredentials)) {
+      showError('Por favor, corrija os erros no formulário');
       return;
     }
-
-    // Validação específica para usuários de empresa
-    if (role === UserRole.COMPANY_USER) {
-      if (!companyName || !companyCode) {
-        alert(
-          "Nome da empresa e código são obrigatórios para usuários de empresa."
-        );
-        return;
-      }
-    }
-
-    const result = registerSchema.safeParse(userCredentials);
-    if (!result.success) {
-      const errors = result.error.format();
-      setFormErrors({
-        name: errors.name?._errors[0],
-        email: errors.email?._errors[0],
-        password: errors.password?._errors[0],
-        confirmPassword: errors.confirmPassword?._errors[0],
-      });
-      return;
-    }
-
-    setFormErrors({});
 
     try {
       // Gerar ID único simples para demonstração
@@ -172,11 +146,18 @@ export default function RegisterSplit() {
       );
 
       console.log("Usuário cadastrado com sucesso");
+      showSuccess('Conta criada com sucesso!');
+      clearAllErrors();
       navigate("/home");
     } catch (err) {
       console.error("Erro ao cadastrar:", err);
-      alert("Erro ao cadastrar. Verifique os dados e tente novamente.");
+      showError("Erro ao cadastrar. Verifique os dados e tente novamente.");
     }
+  };
+
+  // Handler para validar campo quando perde o foco
+  const handleBlur = (field: keyof userCredentials) => {
+    validateField(field, userCredentials[field]);
   };
 
   return (
@@ -244,10 +225,12 @@ export default function RegisterSplit() {
               onChange={(e) =>
                 setUserCredentials({ ...userCredentials, name: e.target.value })
               }
+              onBlur={() => handleBlur('name')}
               placeholder={translations.namePlaceholder}
+              className={errors.name ? 'input-error' : ''}
               required
             />
-            {formErrors.name && <p className="error-text">{formErrors.name}</p>}
+            {errors.name && <p className="error-text">{errors.name}</p>}
           </div>
 
           <div className="split-form-group">
@@ -262,11 +245,13 @@ export default function RegisterSplit() {
                   email: e.target.value,
                 })
               }
+              onBlur={() => handleBlur('email')}
               placeholder={translations.emailPlaceholder}
+              className={errors.email ? 'input-error' : ''}
               required
             />
-            {formErrors.email && (
-              <p className="error-text">{formErrors.email}</p>
+            {errors.email && (
+              <p className="error-text">{errors.email}</p>
             )}
           </div>
 
@@ -284,11 +269,13 @@ export default function RegisterSplit() {
                       companyName: e.target.value,
                     })
                   }
+                  onBlur={() => handleBlur('companyName')}
                   placeholder="Digite o nome da sua empresa"
+                  className={errors.companyName ? 'input-error' : ''}
                   required={!isCreatingAdmin}
                 />
-                {formErrors.companyName && (
-                  <p className="error-text">{formErrors.companyName}</p>
+                {errors.companyName && (
+                  <p className="error-text">{errors.companyName}</p>
                 )}
               </div>
 
@@ -303,12 +290,14 @@ export default function RegisterSplit() {
                       companyCode: e.target.value.toUpperCase(),
                     })
                   }
+                  onBlur={() => handleBlur('companyCode')}
                   placeholder="Ex: LOG001"
+                  className={errors.companyCode ? 'input-error' : ''}
                   required={!isCreatingAdmin}
                 />
                 <small>Código único para identificar sua empresa</small>
-                {formErrors.companyCode && (
-                  <p className="error-text">{formErrors.companyCode}</p>
+                {errors.companyCode && (
+                  <p className="error-text">{errors.companyCode}</p>
                 )}
               </div>
             </>
@@ -327,11 +316,17 @@ export default function RegisterSplit() {
                     password: e.target.value,
                   })
                 }
+                onBlur={() => handleBlur('password')}
                 placeholder={translations.passwordPlaceholder}
+                className={errors.password ? 'input-error' : ''}
                 required
               />
-              {formErrors.password && (
-                <p className="error-text">{formErrors.password}</p>
+              <PasswordStrengthIndicator 
+                password={userCredentials.password}
+                showTips={!!userCredentials.password && !!errors.password}
+              />
+              {errors.password && (
+                <p className="error-text">{errors.password}</p>
               )}
             </div>
 
@@ -349,11 +344,13 @@ export default function RegisterSplit() {
                     confirmPassword: e.target.value,
                   })
                 }
+                onBlur={() => handleBlur('confirmPassword')}
                 placeholder={translations.confirmPasswordPlaceholder}
+                className={errors.confirmPassword ? 'input-error' : ''}
                 required
               />
-              {formErrors.confirmPassword && (
-                <p className="error-text">{formErrors.confirmPassword}</p>
+              {errors.confirmPassword && (
+                <p className="error-text">{errors.confirmPassword}</p>
               )}
             </div>
           </div>

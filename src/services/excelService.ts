@@ -1,6 +1,12 @@
 import { collection, doc, setDoc } from "firebase/firestore";
 import { azureConfig } from "../config/azureConfig";
 import { db } from "../lib/firebaseConfig";
+import {
+  isRetryableError,
+  logExcelError,
+  mapGraphApiError,
+} from "../utils/excelErrorHandler";
+import { retryWithBackoff } from "../utils/retryWithBackoff";
 
 // Tipos para Excel
 export interface ExcelTable {
@@ -46,8 +52,11 @@ export interface ExcelConfig {
 
 class ExcelService {
   private accessToken: string | null = null;
+  private refreshToken: string | null = null;
+  private tokenExpiry: number | null = null;
   private isAuthenticating = false;
   private baseUrl = azureConfig.graphApiUrl;
+  private tokenRefreshPromise: Promise<string> | null = null;
 
   // URL da planilha específica do usuário
   private specificWorkbookUrl =
@@ -174,8 +183,20 @@ class ExcelService {
         console.error(
           "Popup bloqueado pelo navegador. Tentando redirecionamento direto..."
         );
-        // Fallback: redirecionamento direto
-        window.location.href = authUrl.toString();
+
+        // Pergunta ao usuário se quer fazer redirect
+        const userWantsRedirect = window.confirm(
+          "O popup foi bloqueado pelo navegador. Deseja ser redirecionado para fazer login?\n\n" +
+            "Você será redirecionado para a página de login da Microsoft e depois voltará para esta página."
+        );
+
+        if (userWantsRedirect) {
+          // Salva a URL atual para voltar depois
+          sessionStorage.setItem("excel_auth_return_url", window.location.href);
+          // Fallback: redirecionamento direto
+          window.location.href = authUrl.toString();
+        }
+
         resolve(false);
         return;
       }
@@ -218,8 +239,26 @@ class ExcelService {
 
         if (event.data.type === "EXCEL_AUTH_SUCCESS") {
           popupClosed = true;
-          this.accessToken = event.data.token;
-          localStorage.setItem("excel_access_token", event.data.token);
+          if (!event.data.token) {
+            throw new Error("Token não recebido na autenticação");
+          }
+
+          const token = event.data.token;
+          this.accessToken = token;
+          this.refreshToken = event.data.refresh_token || null;
+
+          this.tokenExpiry =
+            Date.now() + (event.data.expires_in || 3600) * 1000;
+
+          localStorage.setItem("excel_access_token", token);
+          if (this.refreshToken) {
+            localStorage.setItem("excel_refresh_token", this.refreshToken);
+          }
+          localStorage.setItem(
+            "excel_token_expiry",
+            this.tokenExpiry.toString()
+          );
+
           console.log(
             "Token salvo com sucesso:",
             event.data.token.substring(0, 20) + "..."
@@ -262,25 +301,271 @@ class ExcelService {
           Authorization: `Bearer ${token}`,
         },
       });
+
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({}));
+        logExcelError(
+          { status: response.status, ...errorData },
+          "validateToken"
+        );
+      }
+
       return response.ok;
-    } catch {
+    } catch (error) {
+      logExcelError(error, "validateToken");
       return false;
     }
   }
 
   /**
+   * Verifica se o token está expirado ou próximo de expirar
+   */
+  private isTokenExpired(): boolean {
+    if (!this.tokenExpiry) return true;
+    // Considera expirado se faltam menos de 5 minutos
+    return Date.now() >= this.tokenExpiry - 5 * 60 * 1000;
+  }
+
+  /**
+   * Tenta fazer refresh do token usando o refresh token
+   */
+  private async refreshAccessToken(): Promise<string> {
+    // Se já há um refresh em andamento, aguarda ele
+    if (this.tokenRefreshPromise) {
+      return this.tokenRefreshPromise;
+    }
+
+    this.tokenRefreshPromise = (async (): Promise<string> => {
+      try {
+        // Se não temos refresh token, precisa fazer login novamente
+        if (!this.refreshToken) {
+          const refreshed = await this.initializeAuth();
+          if (!refreshed) {
+            throw new Error(
+              "Não foi possível renovar o token. Faça login novamente."
+            );
+          }
+          if (!this.accessToken) {
+            throw new Error("Token não disponível após autenticação");
+          }
+          return this.accessToken;
+        }
+
+        // Tenta fazer refresh via backend
+        const response = await fetch(
+          azureConfig.tokenUrl.replace("/token", "/refresh"),
+          {
+            method: "POST",
+            headers: {
+              "Content-Type": "application/json",
+            },
+            body: JSON.stringify({
+              refresh_token: this.refreshToken,
+            }),
+          }
+        );
+
+        if (!response.ok) {
+          throw new Error("Erro ao renovar token");
+        }
+
+        const tokenData = await response.json();
+        if (!tokenData.access_token) {
+          throw new Error("Token de acesso não recebido do servidor");
+        }
+
+        this.accessToken = tokenData.access_token;
+        this.refreshToken = tokenData.refresh_token || this.refreshToken;
+
+        // Calcula expiração (padrão: 1 hora)
+        this.tokenExpiry = Date.now() + (tokenData.expires_in || 3600) * 1000;
+
+        if (!this.accessToken) {
+          throw new Error("Token não disponível após renovação");
+        }
+
+        localStorage.setItem("excel_access_token", this.accessToken);
+        if (this.refreshToken) {
+          localStorage.setItem("excel_refresh_token", this.refreshToken);
+        }
+        localStorage.setItem("excel_token_expiry", this.tokenExpiry.toString());
+
+        console.log("Token renovado com sucesso");
+        return this.accessToken;
+      } catch (error) {
+        logExcelError(error, "refreshAccessToken");
+        // Se refresh falhar, tenta fazer login novamente
+        const refreshed = await this.initializeAuth();
+        if (!refreshed) {
+          throw new Error(
+            "Não foi possível renovar o token. Faça login novamente."
+          );
+        }
+        if (!this.accessToken) {
+          throw new Error("Token não disponível após autenticação");
+        }
+        return this.accessToken;
+      } finally {
+        this.tokenRefreshPromise = null;
+      }
+    })();
+
+    return this.tokenRefreshPromise;
+  }
+
+  /**
+   * Carrega token e informações de expiração do localStorage
+   */
+  private loadTokenFromStorage(): void {
+    const token = localStorage.getItem("excel_access_token");
+    const expiry = localStorage.getItem("excel_token_expiry");
+    const refresh = localStorage.getItem("excel_refresh_token");
+
+    if (token && !token.startsWith("mock_access_token_")) {
+      this.accessToken = token;
+      this.tokenExpiry = expiry ? parseInt(expiry, 10) : null;
+      this.refreshToken = refresh;
+    }
+  }
+
+  /**
    * Garante que temos um token válido antes de fazer requisições
+   * Verifica expiração e faz refresh se necessário
    */
   private async ensureValidToken(): Promise<void> {
+    // Carrega token do storage se não estiver em memória
     if (!this.accessToken) {
-      const token = localStorage.getItem("excel_access_token");
-      if (token && !token.startsWith("mock_access_token_")) {
-        this.accessToken = token;
-        console.log("Token carregado do localStorage");
-      } else {
-        throw new Error("Token de acesso não disponível. Faça login primeiro.");
+      this.loadTokenFromStorage();
+    }
+
+    // Se ainda não tem token, precisa fazer login
+    if (!this.accessToken) {
+      throw new Error("Token de acesso não disponível. Faça login primeiro.");
+    }
+
+    // Verifica se token está expirado ou próximo de expirar
+    if (this.isTokenExpired()) {
+      console.log("Token expirado ou próximo de expirar. Renovando...");
+      try {
+        await this.refreshAccessToken();
+      } catch (error) {
+        logExcelError(error, "ensureValidToken");
+        // Se não conseguir renovar, tenta fazer login novamente
+        const refreshed = await this.initializeAuth();
+        if (!refreshed) {
+          throw new Error(
+            "Não foi possível renovar o token. Faça login novamente."
+          );
+        }
       }
     }
+
+    // Valida token antes de usar (opcional, pode ser custoso)
+    // Apenas valida se não validou recentemente
+    const lastValidation = localStorage.getItem("excel_last_token_validation");
+    const now = Date.now();
+    if (!lastValidation || now - parseInt(lastValidation, 10) > 5 * 60 * 1000) {
+      const isValid = await this.validateToken(this.accessToken);
+      if (!isValid) {
+        console.log("Token inválido. Renovando...");
+        await this.refreshAccessToken();
+      }
+      localStorage.setItem("excel_last_token_validation", now.toString());
+    }
+  }
+
+  /**
+   * Wrapper para requisições com retry automático e tratamento de erros
+   */
+  private async makeRequest<T>(
+    url: string,
+    options: RequestInit = {}
+  ): Promise<T> {
+    await this.ensureValidToken();
+
+    return retryWithBackoff(
+      async () => {
+        const response = await fetch(url, {
+          ...options,
+          headers: {
+            ...options.headers,
+            Authorization: `Bearer ${this.accessToken}`,
+          },
+        });
+
+        if (!response.ok) {
+          const errorData = await response.json().catch(() => ({
+            error: {
+              message: response.statusText,
+              code: `HTTP_${response.status}`,
+            },
+          }));
+
+          const excelError = mapGraphApiError({
+            status: response.status,
+            message: errorData.error?.message || response.statusText,
+            ...errorData,
+          });
+
+          logExcelError(excelError, `makeRequest: ${url}`);
+
+          // Se for erro de autenticação, tenta renovar token uma vez
+          if (
+            response.status === 401 &&
+            !(options.headers as any)?.["X-Retry-Auth"]
+          ) {
+            console.log("Erro 401 detectado. Tentando renovar token...");
+            await this.refreshAccessToken();
+
+            // Retenta com flag para evitar loop
+            const retryResponse = await fetch(url, {
+              ...options,
+              headers: {
+                ...options.headers,
+                Authorization: `Bearer ${this.accessToken}`,
+                "X-Retry-Auth": "true",
+              },
+            });
+
+            if (!retryResponse.ok) {
+              throw excelError;
+            }
+
+            // Para DELETE, pode não ter body
+            if (
+              retryResponse.status === 204 ||
+              retryResponse.headers.get("content-length") === "0"
+            ) {
+              return {} as T;
+            }
+
+            return retryResponse.json() as T;
+          }
+
+          throw excelError;
+        }
+
+        // Para DELETE e outras operações que podem não retornar JSON
+        if (
+          response.status === 204 ||
+          response.headers.get("content-length") === "0"
+        ) {
+          return {} as T;
+        }
+
+        // Tenta fazer parse do JSON, se falhar retorna objeto vazio
+        try {
+          return (await response.json()) as T;
+        } catch {
+          return {} as T;
+        }
+      },
+      {
+        maxRetries: 3,
+        initialDelay: 1000,
+        retryable: (error) => isRetryableError(error),
+      }
+    );
   }
 
   /**
@@ -292,44 +577,22 @@ class ExcelService {
     try {
       // Primeiro, vamos tentar uma query mais simples para testar a conectividade
       console.log("Testando conectividade com Microsoft Graph...");
-      const testResponse = await fetch(`${this.baseUrl}/me`, {
-        headers: {
-          Authorization: `Bearer ${this.accessToken}`,
-        },
-      });
-
-      if (!testResponse.ok) {
-        console.error(
-          "Erro no teste de conectividade:",
-          testResponse.status,
-          await testResponse.text()
-        );
-        throw new Error(`Erro de conectividade: ${testResponse.statusText}`);
-      }
+      await this.makeRequest(`${this.baseUrl}/me`);
 
       console.log("Conectividade OK, listando arquivos...");
 
       // Primeiro, vamos listar TODOS os arquivos para ver o que está disponível
-      const allFilesResponse = await fetch(
-        `${this.baseUrl}/me/drive/root/children`,
-        {
-          headers: {
-            Authorization: `Bearer ${this.accessToken}`,
-          },
-        }
+      const allFiles = await this.makeRequest<{ value: any[] }>(
+        `${this.baseUrl}/me/drive/root/children`
       );
 
-      if (allFilesResponse.ok) {
-        const allFiles = await allFilesResponse.json();
+      if (allFiles && allFiles.value) {
         console.log("Todos os arquivos no OneDrive:", allFiles);
-        console.log(
-          "Total de arquivos encontrados:",
-          allFiles.value?.length || 0
-        );
+        console.log("Total de arquivos encontrados:", allFiles.value.length);
 
         // Filtra apenas arquivos Excel
         const excelFiles =
-          allFiles.value?.filter(
+          allFiles.value.filter(
             (file: any) =>
               file.name?.endsWith(".xlsx") ||
               file.name?.endsWith(".xls") ||
@@ -346,35 +609,26 @@ class ExcelService {
           );
 
           // Busca por arquivos Excel em toda a conta
-          const searchResponse = await fetch(
-            `${this.baseUrl}/me/drive/root/search(q='.xlsx')`,
-            {
-              headers: {
-                Authorization: `Bearer ${this.accessToken}`,
-              },
-            }
+          const searchResults = await this.makeRequest<{ value: any[] }>(
+            `${this.baseUrl}/me/drive/root/search(q='.xlsx')`
           );
+          console.log("Resultados da busca por .xlsx:", searchResults);
+          const data = searchResults;
+          const workbooks: ExcelWorkbook[] = [];
 
-          if (searchResponse.ok) {
-            const searchResults = await searchResponse.json();
-            console.log("Resultados da busca por .xlsx:", searchResults);
-            const data = searchResults;
-            const workbooks: ExcelWorkbook[] = [];
-
-            for (const file of data.value || []) {
-              try {
-                const workbook = await this.getWorkbookDetails(file.id);
-                workbooks.push(workbook);
-              } catch (error) {
-                console.warn(
-                  `Erro ao obter detalhes do arquivo ${file.name}:`,
-                  error
-                );
-              }
+          for (const file of data.value || []) {
+            try {
+              const workbook = await this.getWorkbookDetails(file.id);
+              workbooks.push(workbook);
+            } catch (error) {
+              console.warn(
+                `Erro ao obter detalhes do arquivo ${file.name}:`,
+                error
+              );
             }
-
-            return workbooks;
           }
+
+          return workbooks;
         } else {
           // Se encontrou arquivos Excel na raiz, processa eles
           const data = { value: excelFiles };
@@ -397,28 +651,9 @@ class ExcelService {
       }
 
       // Fallback: tenta a query original
-      const response = await fetch(
-        `${this.baseUrl}/me/drive/root/children?$filter=endsWith(name,'.xlsx') or endsWith(name,'.xls')`,
-        {
-          headers: {
-            Authorization: `Bearer ${this.accessToken}`,
-          },
-        }
+      const data = await this.makeRequest<{ value: any[] }>(
+        `${this.baseUrl}/me/drive/root/children?$filter=endsWith(name,'.xlsx') or endsWith(name,'.xls')`
       );
-
-      if (!response.ok) {
-        const errorText = await response.text();
-        console.error(
-          "Erro ao listar arquivos Excel:",
-          response.status,
-          errorText
-        );
-        throw new Error(
-          `Erro ao listar arquivos: ${response.status} - ${errorText}`
-        );
-      }
-
-      const data = await response.json();
       console.log("Dados recebidos do Microsoft Graph:", data);
       const workbooks: ExcelWorkbook[] = [];
 
@@ -449,38 +684,14 @@ class ExcelService {
 
     try {
       // Obtém informações básicas do arquivo
-      const fileResponse = await fetch(
-        `${this.baseUrl}/me/drive/items/${workbookId}`,
-        {
-          headers: {
-            Authorization: `Bearer ${this.accessToken}`,
-          },
-        }
+      const fileData = await this.makeRequest<any>(
+        `${this.baseUrl}/me/drive/items/${workbookId}`
       );
-
-      if (!fileResponse.ok) {
-        throw new Error(`Erro ao obter arquivo: ${fileResponse.statusText}`);
-      }
-
-      const fileData = await fileResponse.json();
 
       // Obtém as planilhas
-      const worksheetsResponse = await fetch(
-        `${this.baseUrl}/me/drive/items/${workbookId}/workbook/worksheets`,
-        {
-          headers: {
-            Authorization: `Bearer ${this.accessToken}`,
-          },
-        }
+      const worksheetsData = await this.makeRequest<{ value: any[] }>(
+        `${this.baseUrl}/me/drive/items/${workbookId}/workbook/worksheets`
       );
-
-      if (!worksheetsResponse.ok) {
-        throw new Error(
-          `Erro ao obter planilhas: ${worksheetsResponse.statusText}`
-        );
-      }
-
-      const worksheetsData = await worksheetsResponse.json();
       const worksheets: ExcelWorksheet[] = [];
 
       for (const worksheet of worksheetsData.value) {
@@ -525,25 +736,12 @@ class ExcelService {
     workbookId: string,
     worksheetId: string
   ): Promise<ExcelTable[]> {
-    if (!this.accessToken) {
-      throw new Error("Token de acesso não disponível");
-    }
+    await this.ensureValidToken();
 
     try {
-      const response = await fetch(
-        `${this.baseUrl}/me/drive/items/${workbookId}/workbook/worksheets/${worksheetId}/tables`,
-        {
-          headers: {
-            Authorization: `Bearer ${this.accessToken}`,
-          },
-        }
+      const data = await this.makeRequest<{ value: any[] }>(
+        `${this.baseUrl}/me/drive/items/${workbookId}/workbook/worksheets/${worksheetId}/tables`
       );
-
-      if (!response.ok) {
-        throw new Error(`Erro ao obter tabelas: ${response.statusText}`);
-      }
-
-      const data = await response.json();
       const tables: ExcelTable[] = [];
 
       for (const table of data.value) {
@@ -580,32 +778,12 @@ class ExcelService {
     worksheetId: string,
     tableId: string
   ): Promise<ExcelRow[]> {
-    if (!this.accessToken) {
-      throw new Error("Token de acesso não disponível");
-    }
+    await this.ensureValidToken();
 
     try {
-      const response = await fetch(
-        `${this.baseUrl}/me/drive/items/${workbookId}/workbook/worksheets/${worksheetId}/tables/${tableId}/rows`,
-        {
-          headers: {
-            Authorization: `Bearer ${this.accessToken}`,
-          },
-        }
+      const data = await this.makeRequest<{ value: any[] }>(
+        `${this.baseUrl}/me/drive/items/${workbookId}/workbook/worksheets/${worksheetId}/tables/${tableId}/rows`
       );
-
-      if (!response.ok) {
-        if (response.status === 404) {
-          throw new Error(
-            `Arquivo Excel não encontrado. Verifique se o arquivo existe e se você tem permissão de acesso.`
-          );
-        }
-        throw new Error(
-          `Erro ao obter linhas: ${response.status} - ${response.statusText}`
-        );
-      }
-
-      const data = await response.json();
       return data.value.map((row: any, index: number) => ({
         id: row.id || `row_${index}`,
         values: row.values || [],
@@ -625,17 +803,14 @@ class ExcelService {
     tableId: string,
     values: any[]
   ): Promise<void> {
-    if (!this.accessToken) {
-      throw new Error("Token de acesso não disponível");
-    }
+    await this.ensureValidToken();
 
     try {
-      const response = await fetch(
+      await this.makeRequest(
         `${this.baseUrl}/me/drive/items/${workbookId}/workbook/worksheets/${worksheetId}/tables/${tableId}/rows`,
         {
           method: "POST",
           headers: {
-            Authorization: `Bearer ${this.accessToken}`,
             "Content-Type": "application/json",
           },
           body: JSON.stringify({
@@ -643,10 +818,6 @@ class ExcelService {
           }),
         }
       );
-
-      if (!response.ok) {
-        throw new Error(`Erro ao adicionar linha: ${response.statusText}`);
-      }
     } catch (error) {
       console.error("Erro ao adicionar linha à tabela:", error);
       throw error;
@@ -663,17 +834,14 @@ class ExcelService {
     rowId: string,
     values: any[]
   ): Promise<void> {
-    if (!this.accessToken) {
-      throw new Error("Token de acesso não disponível");
-    }
+    await this.ensureValidToken();
 
     try {
-      const response = await fetch(
+      await this.makeRequest(
         `${this.baseUrl}/me/drive/items/${workbookId}/workbook/worksheets/${worksheetId}/tables/${tableId}/rows/${rowId}`,
         {
           method: "PATCH",
           headers: {
-            Authorization: `Bearer ${this.accessToken}`,
             "Content-Type": "application/json",
           },
           body: JSON.stringify({
@@ -681,10 +849,6 @@ class ExcelService {
           }),
         }
       );
-
-      if (!response.ok) {
-        throw new Error(`Erro ao atualizar linha: ${response.statusText}`);
-      }
     } catch (error) {
       console.error("Erro ao atualizar linha da tabela:", error);
       throw error;
@@ -700,24 +864,15 @@ class ExcelService {
     tableId: string,
     rowId: string
   ): Promise<void> {
-    if (!this.accessToken) {
-      throw new Error("Token de acesso não disponível");
-    }
+    await this.ensureValidToken();
 
     try {
-      const response = await fetch(
+      await this.makeRequest(
         `${this.baseUrl}/me/drive/items/${workbookId}/workbook/worksheets/${worksheetId}/tables/${tableId}/rows/${rowId}`,
         {
           method: "DELETE",
-          headers: {
-            Authorization: `Bearer ${this.accessToken}`,
-          },
         }
       );
-
-      if (!response.ok) {
-        throw new Error(`Erro ao remover linha: ${response.statusText}`);
-      }
     } catch (error) {
       console.error("Erro ao remover linha da tabela:", error);
       throw error;
@@ -731,9 +886,7 @@ class ExcelService {
     config: ExcelConfig,
     shipments: any[]
   ): Promise<void> {
-    if (!this.accessToken) {
-      throw new Error("Token de acesso não disponível");
-    }
+    await this.ensureValidToken();
 
     try {
       // Obtém dados atuais da tabela
@@ -786,9 +939,7 @@ class ExcelService {
    * Obtém dados do Excel e converte para formato do sistema
    */
   async getShipmentsFromExcel(config: ExcelConfig): Promise<any[]> {
-    if (!this.accessToken) {
-      throw new Error("Token de acesso não disponível");
-    }
+    await this.ensureValidToken();
 
     try {
       let rows: ExcelRow[];
@@ -845,53 +996,15 @@ class ExcelService {
     workbookId: string,
     worksheetId: string
   ): Promise<ExcelRow[]> {
-    if (!this.accessToken) {
-      throw new Error("Token de acesso não disponível");
-    }
+    await this.ensureValidToken();
 
     try {
       // Primeiro verifica se o arquivo existe
-      const fileResponse = await fetch(
-        `${this.baseUrl}/me/drive/items/${workbookId}`,
-        {
-          headers: {
-            Authorization: `Bearer ${this.accessToken}`,
-          },
-        }
+      await this.makeRequest(`${this.baseUrl}/me/drive/items/${workbookId}`);
+
+      const data = await this.makeRequest<{ values: any[][] }>(
+        `${this.baseUrl}/me/drive/items/${workbookId}/workbook/worksheets/${worksheetId}/usedRange`
       );
-
-      if (!fileResponse.ok) {
-        if (fileResponse.status === 404) {
-          throw new Error(
-            `Arquivo Excel não encontrado. Verifique se o arquivo existe e se você tem permissão de acesso.`
-          );
-        }
-        throw new Error(
-          `Erro ao acessar arquivo: ${fileResponse.status} - ${fileResponse.statusText}`
-        );
-      }
-
-      const response = await fetch(
-        `${this.baseUrl}/me/drive/items/${workbookId}/workbook/worksheets/${worksheetId}/usedRange`,
-        {
-          headers: {
-            Authorization: `Bearer ${this.accessToken}`,
-          },
-        }
-      );
-
-      if (!response.ok) {
-        if (response.status === 404) {
-          throw new Error(
-            `Planilha não encontrada. Verifique se a planilha "${worksheetId}" existe no arquivo.`
-          );
-        }
-        throw new Error(
-          `Erro ao obter dados da planilha: ${response.status} - ${response.statusText}`
-        );
-      }
-
-      const data = await response.json();
       const rows: ExcelRow[] = [];
 
       if (data.values && Array.isArray(data.values)) {
@@ -922,33 +1035,28 @@ class ExcelService {
    * Configura webhook para mudanças em tempo real (requer Microsoft Graph webhooks)
    */
   async setupWebhook(workbookId: string, callbackUrl: string): Promise<void> {
-    if (!this.accessToken) {
-      throw new Error("Token de acesso não disponível");
-    }
+    await this.ensureValidToken();
 
     try {
-      const response = await fetch(`${this.baseUrl}/subscriptions`, {
-        method: "POST",
-        headers: {
-          Authorization: `Bearer ${this.accessToken}`,
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({
-          changeType: "updated",
-          notificationUrl: callbackUrl,
-          resource: `/me/drive/items/${workbookId}`,
-          expirationDateTime: new Date(
-            Date.now() + 24 * 60 * 60 * 1000
-          ).toISOString(), // 24 horas
-          clientState: "excel_sync",
-        }),
-      });
+      const subscription = await this.makeRequest<{ id: string }>(
+        `${this.baseUrl}/subscriptions`,
+        {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({
+            changeType: "updated",
+            notificationUrl: callbackUrl,
+            resource: `/me/drive/items/${workbookId}`,
+            expirationDateTime: new Date(
+              Date.now() + 24 * 60 * 60 * 1000
+            ).toISOString(), // 24 horas
+            clientState: "excel_sync",
+          }),
+        }
+      );
 
-      if (!response.ok) {
-        throw new Error(`Erro ao configurar webhook: ${response.statusText}`);
-      }
-
-      const subscription = await response.json();
       localStorage.setItem("excel_webhook_id", subscription.id);
     } catch (error) {
       console.error("Erro ao configurar webhook:", error);
@@ -961,21 +1069,21 @@ class ExcelService {
    */
   async removeWebhook(): Promise<void> {
     const webhookId = localStorage.getItem("excel_webhook_id");
-    if (!webhookId || !this.accessToken) {
+    if (!webhookId) {
       return;
     }
 
     try {
-      await fetch(`${this.baseUrl}/subscriptions/${webhookId}`, {
+      await this.ensureValidToken();
+
+      await this.makeRequest(`${this.baseUrl}/subscriptions/${webhookId}`, {
         method: "DELETE",
-        headers: {
-          Authorization: `Bearer ${this.accessToken}`,
-        },
       });
 
       localStorage.removeItem("excel_webhook_id");
     } catch (error) {
       console.error("Erro ao remover webhook:", error);
+      throw error;
     }
   }
 
@@ -1013,9 +1121,10 @@ class ExcelService {
   /**
    * Converte URL do OneDrive para formato correto da API
    */
-  private async getFileFromOneDriveUrl(url: string): Promise<string> {
+  private async getFileFromOneDriveUrl(_url: string): Promise<string> {
     // Para URLs do OneDrive compartilhado, precisamos usar um approach diferente
     // Vamos tentar listar todos os arquivos Excel e encontrar o correto
+    // Nota: _url não é usado atualmente, mas pode ser usado no futuro para buscar arquivo específico
     try {
       console.log(
         "Listando arquivos Excel para encontrar a planilha específica..."
@@ -1083,7 +1192,55 @@ class ExcelService {
   }
 }
 
-export const excelService = new ExcelService();
+// Interface pública para garantir que todos os métodos sejam reconhecidos
+export interface IExcelService {
+  initializeAuth(): Promise<boolean>;
+  validateToken(token: string): Promise<boolean>;
+  listExcelFiles(): Promise<ExcelWorkbook[]>;
+  getWorkbookDetails(workbookId: string): Promise<ExcelWorkbook>;
+  getWorksheetTables(
+    workbookId: string,
+    worksheetId: string
+  ): Promise<ExcelTable[]>;
+  getTableRows(
+    workbookId: string,
+    worksheetId: string,
+    tableId: string
+  ): Promise<ExcelRow[]>;
+  addTableRow(
+    workbookId: string,
+    worksheetId: string,
+    tableId: string,
+    values: any[]
+  ): Promise<void>;
+  updateTableRow(
+    workbookId: string,
+    worksheetId: string,
+    tableId: string,
+    rowId: string,
+    values: any[]
+  ): Promise<void>;
+  deleteTableRow(
+    workbookId: string,
+    worksheetId: string,
+    tableId: string,
+    rowId: string
+  ): Promise<void>;
+  syncShipmentsToExcel(config: ExcelConfig, shipments: any[]): Promise<void>;
+  getShipmentsFromExcel(config: ExcelConfig): Promise<any[]>;
+  getWorksheetDataDirect(
+    workbookId: string,
+    worksheetId: string
+  ): Promise<ExcelRow[]>;
+  setupWebhook(workbookId: string, callbackUrl: string): Promise<void>;
+  removeWebhook(): Promise<void>;
+  getSpecificWorkbook(): Promise<ExcelWorkbook>;
+  disconnect(): void;
+  clearMockTokens(): void;
+  clearAuthState(): void;
+}
+
+export const excelService: IExcelService = new ExcelService();
 
 async function saveExcelDataToCache(data: any) {
   const cacheRef = collection(db, "excelCache");
