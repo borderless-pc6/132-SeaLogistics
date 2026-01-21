@@ -10,7 +10,7 @@ const messages = {
   positiveNumber: 'Deve ser um número positivo',
 };
 
-// Schema para campos comuns
+// Schema para campos comuns (sem o campo 'tipo' que será específico de cada schema)
 const baseShipmentFields = {
   clienteId: z.string().min(1, messages.required),
   operador: z.string().min(1, messages.required),
@@ -23,9 +23,6 @@ const baseShipmentFields = {
   booking: z.string().optional(),
   invoice: z.string().optional(),
   shipper: z.string().optional(),
-  tipo: z.enum(['Aéreo', 'Marítimo', 'Terrestre'], {
-    errorMap: () => ({ message: 'Selecione um tipo de transporte' }),
-  }),
 };
 
 // Schema para transporte Marítimo
@@ -97,15 +94,20 @@ export const landShipmentSchema = z.object({
 );
 
 // Schema dinâmico que se adapta ao tipo
-export const dynamicShipmentSchema = z.discriminatedUnion('tipo', [
-  maritimeShipmentSchema,
-  airShipmentSchema,
-  landShipmentSchema,
-]);
+// COMENTADO: Não está sendo usado e causa erro no runtime
+// Se precisar usar discriminatedUnion no futuro, descomente esta linha
+// export const dynamicShipmentSchema = z.discriminatedUnion('tipo', [
+//   maritimeShipmentSchema,
+//   airShipmentSchema,
+//   landShipmentSchema,
+// ]);
 
 // Schema genérico (quando tipo não foi selecionado ainda)
 export const genericShipmentSchema = z.object({
   ...baseShipmentFields,
+  tipo: z.enum(['Aéreo', 'Marítimo', 'Terrestre', ''] as const, {
+    errorMap: () => ({ message: 'Selecione um tipo de transporte' }),
+  }).optional(),
   pol: z.string().optional(),
   pod: z.string().optional(),
 });
