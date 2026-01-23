@@ -22,41 +22,39 @@ const ExcelIntegrationPage: React.FC = () => {
         <main className="excel-integration-page">
             <Navbar />
             <div className="excel-integration-page-content">
-                <div className="page-header">
-                    <button
-                        className="back-button"
-                        onClick={() => navigate('/admin-dashboard')}
-                    >
-                        ← Voltar ao Dashboard
-                    </button>
-                    <h1>{translations.excelIntegration}</h1>
-                    <p>{translations.useExcelAsDatabase}</p>
-
-                    <div className="mode-toggle">
-                        <button
-                            className={`toggle-btn ${useTestMode ? 'active' : ''}`}
-                            onClick={() => setUseTestMode(true)}
-                        >
-                            🧪 Modo Teste
-                        </button>
-                        <button
-                            className={`toggle-btn ${!useTestMode ? 'active' : ''}`}
-                            onClick={() => setUseTestMode(false)}
-                        >
-                            🔗 Modo Real
-                        </button>
+                <div className="excel-integration-wrapper">
+                    <div className="excel-integration-header">
+                        <h1>{translations.excelIntegration}</h1>
+                        <p>{translations.useExcelAsDatabase}</p>
                     </div>
-                </div>
 
-                <div className="excel-integration-container">
-                    {useTestMode ? (
-                        <ExcelTest />
-                    ) : (
-                        <ExcelIntegration
-                            shipments={shipments}
-                            onShipmentsUpdate={handleShipmentsUpdate}
-                        />
-                    )}
+                    <div className="mode-toggle-section">
+                        <div className="mode-toggle">
+                            <button
+                                className={`toggle-btn ${useTestMode ? 'active' : ''}`}
+                                onClick={() => setUseTestMode(true)}
+                            >
+                                🧪 Modo Teste
+                            </button>
+                            <button
+                                className={`toggle-btn ${!useTestMode ? 'active' : ''}`}
+                                onClick={() => setUseTestMode(false)}
+                            >
+                                🔗 Modo Real
+                            </button>
+                        </div>
+                    </div>
+
+                    <div className="excel-integration-container">
+                        {useTestMode ? (
+                            <ExcelTest />
+                        ) : (
+                            <ExcelIntegration
+                                shipments={shipments}
+                                onShipmentsUpdate={handleShipmentsUpdate}
+                            />
+                        )}
+                    </div>
                 </div>
             </div>
             <ChatAssistant />
