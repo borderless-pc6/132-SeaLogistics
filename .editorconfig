@@ -1,0 +1,43 @@
+# EditorConfig is awesome: https://EditorConfig.org
+
+# top-most EditorConfig file
+root = true
+
+# Unix-style newlines with a newline ending every file
+[*]
+end_of_line = lf
+insert_final_newline = true
+charset = utf-8
+trim_trailing_whitespace = true
+
+# Indentation override for all JS, JSX, TS, TSX, JSON files
+[*.{js,jsx,ts,tsx,json}]
+indent_style = space
+indent_size = 2
+
+# Indentation override for all CSS, SCSS files
+[*.{css,scss}]
+indent_style = space
+indent_size = 2
+
+# Indentation override for HTML files
+[*.html]
+indent_style = space
+indent_size = 2
+
+# Indentation override for Markdown files
+[*.md]
+trim_trailing_whitespace = false
+indent_style = space
+indent_size = 2
+
+# Indentation override for YAML files
+[*.{yml,yaml}]
+indent_style = space
+indent_size = 2
+
+# Indentation override for TOML files
+[*.toml]
+indent_style = space
+indent_size = 2
+

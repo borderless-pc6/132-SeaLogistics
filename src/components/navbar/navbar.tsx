@@ -1,6 +1,6 @@
 "use client";
 
-import { Home, Menu, Plus, Settings, Ship, X } from "lucide-react";
+import { ChevronLeft, ChevronRight, Home, Plus, Settings, Ship, X } from "lucide-react";
 import { useContext, useState } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
 import logo2 from "../../assets/logo2.png";
@@ -41,7 +41,7 @@ const Navbar = () => {
             onClick={() => setIsCollapsed(!isCollapsed)}
             aria-label={!isCollapsed ? translations.collapseMenu : translations.expandMenu}
           >
-            {!isCollapsed ? <X size={20} /> : <Menu size={20} />}
+            {isCollapsed ? <ChevronRight size={24} /> : <ChevronLeft size={24} />}
           </button>
 
           <div className="company-logo">

@@ -17,7 +17,9 @@ import {
   XAxis,
   YAxis,
 } from "recharts";
+import { EmptyState } from "../empty-state/empty-state";
 import { useLanguage } from "../../context/language-context";
+import "../../utils/animations.css";
 import "./dashboard-charts.css";
 
 interface ChartData {
@@ -352,12 +354,12 @@ export const DashboardCharts: React.FC<DashboardChartsProps> = ({
     }
 
     return (
-      <div className="dashboard-charts">
-        <div className="no-data-message">
-          <Package size={48} />
-          <h3>Nenhum dado disponível</h3>
-          <p>Não há envios para exibir nos gráficos.</p>
-        </div>
+      <div className="dashboard-charts fade-in">
+        <EmptyState
+          icon={Package}
+          title={translations.noData || "Nenhum dado disponível"}
+          description="Não há envios para exibir nos gráficos. Crie um novo envio para começar."
+        />
       </div>
     );
   }

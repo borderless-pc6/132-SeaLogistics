@@ -22,6 +22,7 @@ import {
   logAuthError,
   mapAuthError,
 } from "../utils/authErrorHandler";
+import { verifyPassword } from "../utils/passwordUtils";
 import { retryWithBackoff } from "../utils/retryWithBackoff";
 
 interface AuthContextType {
@@ -316,8 +317,8 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
 
   const login = async (email: string, password: string) => {
     try {
-      // Simular autenticação (em produção usar Firebase Auth)
-      // TODO: Implementar validação de senha quando usar Firebase Auth
+      // Autenticação customizada com validação de senha via hash SHA-256
+      // Em produção, considere migrar para Firebase Auth para recursos adicionais
       console.log(
         "Attempting login with password:",
         password ? "***" : "no password"
@@ -346,7 +347,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
       }
 
       const userDoc = querySnapshot.docs[0];
-      const userData = { ...userDoc.data(), uid: userDoc.id } as User;
+      const userData = { ...userDoc.data(), uid: userDoc.id } as User & { passwordHash?: string };
 
       console.log("Usuário encontrado:", userData);
 
@@ -356,6 +357,27 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
         throw error;
       }
 
+      // Verificar senha
+      const passwordHash = userData.passwordHash;
+      if (!passwordHash) {
+        // Usuário antigo sem senha cadastrada - permitir login apenas se não houver senha
+        // Mas é melhor forçar redefinição de senha
+        const error = new Error("Senha não cadastrada. Por favor, redefina sua senha.");
+        logAuthError(error, "login");
+        throw error;
+      }
+
+      const isPasswordValid = await verifyPassword(password, passwordHash);
+      if (!isPasswordValid) {
+        const error = new Error("Senha incorreta");
+        logAuthError(error, "login");
+        throw error;
+      }
+
+      // Remover passwordHash do objeto antes de salvar no estado
+      const { passwordHash: _, ...userDataWithoutPassword } = userData;
+      const finalUserData = userDataWithoutPassword as User;
+
       // Atualizar último login com retry
       try {
         await retryWithBackoff(
@@ -363,7 +385,8 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
             await setDoc(
               doc(db, "users", userDoc.id),
               {
-                ...userData,
+                ...finalUserData,
+                passwordHash, // Manter o hash no banco
                 lastLogin: new Date(),
               },
               { merge: true }
@@ -380,7 +403,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
         logAuthError(error, "login - updateLastLogin");
       }
 
-      setCurrentUser(userData);
+      setCurrentUser(finalUserData);
 
       // Carregar empresa se necessário
       if (userData.role === UserRole.COMPANY_USER && userData.companyId) {

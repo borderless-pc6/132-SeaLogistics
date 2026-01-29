@@ -96,15 +96,21 @@
 
 .split-form-group input {
   padding: 0.75rem;
-  border: 1px solid var(--light-gray);
+  border: 1px solid #d1d5db;
   border-radius: 4px;
   font-size: 1rem;
   transition: border-color 0.3s;
+  background-color: white;
 }
 
 .split-form-group input:focus {
   outline: none;
   border-color: var(--primary-color);
+  box-shadow: 0 0 0 3px rgba(48, 89, 81, 0.1);
+}
+
+.split-form-group input:hover {
+  border-color: #9ca3af;
 }
 
 .split-button {

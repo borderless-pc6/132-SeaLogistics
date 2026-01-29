@@ -9,7 +9,9 @@
     "lint": "eslint . --ext ts,tsx --report-unused-disable-directives --max-warnings 0",
     "preview": "vite preview",
     "server": "node server.js",
-    "test:email": "tsx test-email.ts"
+    "test:email": "tsx test-email.ts",
+    "clean": "node -e \"const fs=require('fs');const path=require('path');function rmdir(dir){if(fs.existsSync(dir)){fs.readdirSync(dir).forEach(f=>{const cur=path.join(dir,f);fs.statSync(cur).isDirectory()?rmdir(cur):fs.unlinkSync(cur);});fs.rmdirSync(dir);}}['dist','node_modules/.vite'].forEach(d=>rmdir(d));console.log('✅ Arquivos temporários removidos!')\"",
+    "clean:logs": "node -e \"const fs=require('fs');const glob=require('glob');glob.sync('**/*.log').forEach(f=>fs.unlinkSync(f));console.log('✅ Logs removidos!')\""
   },
   "dependencies": {
     "@emailjs/browser": "^3.11.0",

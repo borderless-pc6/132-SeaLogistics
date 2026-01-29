@@ -1,5 +1,6 @@
 import { Calendar, Filter, X } from "lucide-react";
 import React, { useCallback, useEffect, useState } from "react";
+import { useLanguage } from "../../context/language-context";
 import "./advanced-filters.css";
 
 interface AdvancedFiltersProps {
@@ -22,6 +23,7 @@ export const AdvancedFilters: React.FC<AdvancedFiltersProps> = ({
   onFiltersChange,
   isAdmin = false,
 }) => {
+  const { translations } = useLanguage();
   const [filters, setFilters] = useState<FilterOptions>({
     period: "",
     status: "",
@@ -209,7 +211,7 @@ export const AdvancedFilters: React.FC<AdvancedFiltersProps> = ({
           onClick={() => setShowFilters(!showFilters)}
         >
           <Filter size={16} />
-          Filtros Avançados
+          {translations.advancedFilters}
           {activeFiltersCount > 0 && (
             <span className="active-filters-badge">{activeFiltersCount}</span>
           )}
@@ -220,7 +222,7 @@ export const AdvancedFilters: React.FC<AdvancedFiltersProps> = ({
       {showFilters && (
         <div className="filters-panel">
           <div className="filters-header">
-            <h3>Filtros Avançados</h3>
+            <h3>{translations.advancedFilters}</h3>
             <button
               className="close-filters-btn"
               onClick={() => setShowFilters(false)}
@@ -252,26 +254,26 @@ export const AdvancedFilters: React.FC<AdvancedFiltersProps> = ({
 
               {/* Filtro por status */}
               <div className="filter-group">
-                <label htmlFor="status">Status</label>
+                <label htmlFor="status">{translations.status}</label>
                 <select
                   id="status"
                   value={filters.status}
                   onChange={(e) => handleFilterChange("status", e.target.value)}
                 >
-                  <option value="">Todos os status</option>
-                  <option value="documentacao">Documentação</option>
-                  <option value="agendado">Agendado</option>
-                  <option value="embarcado">Embarcado</option>
-                  <option value="em-transito">Em Trânsito</option>
-                  <option value="concluido">Concluído</option>
-                  <option value="entregue">Entregue</option>
+                  <option value="">{translations.allStatuses}</option>
+                  <option value="documentacao">{translations.statusDocumentation}</option>
+                  <option value="agendado">{translations.statusScheduled}</option>
+                  <option value="embarcado">{translations.statusShipping}</option>
+                  <option value="em-transito">{translations.statusInTransit}</option>
+                  <option value="concluido">{translations.statusCompleted}</option>
+                  <option value="entregue">{translations.statusDelivered}</option>
                 </select>
               </div>
 
               {/* Filtro por tipo de documento (apenas para admin) */}
               {isAdmin && (
                 <div className="filter-group">
-                  <label htmlFor="documentType">Tipo de Documento</label>
+                  <label htmlFor="documentType">{translations.documentType}</label>
                   <select
                     id="documentType"
                     value={filters.documentType}
@@ -279,25 +281,25 @@ export const AdvancedFilters: React.FC<AdvancedFiltersProps> = ({
                       handleFilterChange("documentType", e.target.value)
                     }
                   >
-                    <option value="">Todos os tipos</option>
-                    <option value="bl">Bill of Lading</option>
-                    <option value="invoice">Invoice</option>
-                    <option value="packing-list">Packing List</option>
-                    <option value="certificate">Certificate</option>
-                    <option value="other">Outros</option>
+                    <option value="">{translations.allDocumentTypes}</option>
+                    <option value="bl">{translations.billOfLading}</option>
+                    <option value="invoice">{translations.invoiceLabel}</option>
+                    <option value="packing-list">{translations.packingListLabel}</option>
+                    <option value="certificate">{translations.certificateOfOriginLabel}</option>
+                    <option value="other">{translations.otherLabel}</option>
                   </select>
                 </div>
               )}
 
               {/* Filtro por cliente */}
               <div className="filter-group">
-                <label htmlFor="client">Cliente</label>
+                <label htmlFor="client">{translations.client}</label>
                 <select
                   id="client"
                   value={filters.client}
                   onChange={(e) => handleFilterChange("client", e.target.value)}
                 >
-                  <option value="">Todos os clientes</option>
+                  <option value="">{translations.allClients}</option>
                   {getUniqueClients().map((client) => (
                     <option key={client} value={client}>
                       {client}
@@ -308,7 +310,7 @@ export const AdvancedFilters: React.FC<AdvancedFiltersProps> = ({
 
               {/* Filtro por data de início */}
               <div className="filter-group">
-                <label htmlFor="dateFrom">Data de Início</label>
+                <label htmlFor="dateFrom">{translations.startDate}</label>
                 <input
                   type="date"
                   id="dateFrom"
@@ -321,7 +323,7 @@ export const AdvancedFilters: React.FC<AdvancedFiltersProps> = ({
 
               {/* Filtro por data de fim */}
               <div className="filter-group">
-                <label htmlFor="dateTo">Data de Fim</label>
+                <label htmlFor="dateTo">{translations.endDate}</label>
                 <input
                   type="date"
                   id="dateTo"
@@ -334,8 +336,9 @@ export const AdvancedFilters: React.FC<AdvancedFiltersProps> = ({
             {/* Resultados dos filtros */}
             <div className="filters-results">
               <p>
-                <strong>{filteredShipments.length}</strong> de{" "}
-                <strong>{shipments.length}</strong> envios encontrados
+                {translations.xOfYFound
+                  .replace("{filtered}", filteredShipments.length.toString())
+                  .replace("{total}", shipments.length.toString())}
               </p>
             </div>
 
@@ -346,7 +349,7 @@ export const AdvancedFilters: React.FC<AdvancedFiltersProps> = ({
                 onClick={clearFilters}
                 disabled={activeFiltersCount === 0}
               >
-                Limpar Filtros
+                {translations.clearFilters}
               </button>
             </div>
           </div>

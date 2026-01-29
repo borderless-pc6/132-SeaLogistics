@@ -6,6 +6,7 @@ import { collection, getDocs, query, where } from "firebase/firestore";
 import { FileText, MapPin, Package, Save, Ship, User, X } from "lucide-react";
 import { useEffect, useState } from "react";
 import { createPortal } from "react-dom";
+import { useLanguage } from "../../context/language-context";
 import type { Shipment } from "../../context/shipments-context";
 import { db } from "../../lib/firebaseConfig";
 import { Cliente } from "../../types/customer";
@@ -47,6 +48,7 @@ const EditShipmentModal = ({
   onSave,
   canEdit,
 }: EditShipmentModalProps) => {
+  const { translations } = useLanguage();
   const [formData, setFormData] = useState<FormData>({
     cliente: "",
     operador: "",
@@ -90,7 +92,7 @@ const EditShipmentModal = ({
           const data = doc.data();
           return {
             id: doc.id,
-            nome: data.displayName || data.name || "Usuário",
+            nome: data.displayName || data.name || translations.user,
             empresa: data.companyName || "-",
             email: data.email || "-",
             companyId: data.companyId || undefined,
@@ -107,7 +109,7 @@ const EditShipmentModal = ({
     };
 
     fetchClientes();
-  }, []);
+  }, [translations]);
 
   const armadores = [
     "MSC",
@@ -237,43 +239,43 @@ const EditShipmentModal = ({
     const newErrors: Record<string, string> = {};
 
     if (!formData.cliente.trim()) {
-      newErrors.cliente = "Cliente é obrigatório";
+      newErrors.cliente = translations.clientRequired;
     }
     if (!formData.operador.trim()) {
-      newErrors.operador = "Operador é obrigatório";
+      newErrors.operador = translations.operatorRequired;
     }
     if (!formData.tipo.trim()) {
-      newErrors.tipo = "Tipo de transporte é obrigatório";
+      newErrors.tipo = translations.transportTypeRequired;
     }
     // Validação dos portos apenas se o tipo for marítimo
-    if (formData.tipo === "Marítimo") {
+    if (formData.tipo === "Marítimo" || formData.tipo === "Maritime") {
       if (!formData.pol.trim()) {
-        newErrors.pol = "Porto de origem é obrigatório";
+        newErrors.pol = translations.originPortRequired;
       }
       if (!formData.pod.trim()) {
-        newErrors.pod = "Porto de destino é obrigatório";
+        newErrors.pod = translations.destinationPortRequired;
       }
     }
     if (!formData.etdOrigem) {
-      newErrors.etdOrigem = "Data de partida é obrigatória";
+      newErrors.etdOrigem = translations.departureDateRequired;
     }
     if (!formData.etaDestino) {
-      newErrors.etaDestino = "Data de chegada é obrigatória";
+      newErrors.etaDestino = translations.arrivalDateRequired;
     }
     if (!formData.numeroBl.trim()) {
-      newErrors.numeroBl = "Número do BL é obrigatório";
+      newErrors.numeroBl = translations.blNumberRequired;
     }
     if (!formData.booking.trim()) {
-      newErrors.booking = "Número do booking é obrigatório";
+      newErrors.booking = translations.bookingRequired;
     }
     if (!formData.invoice.trim()) {
-      newErrors.invoice = "Número do invoice é obrigatório";
+      newErrors.invoice = translations.invoiceRequired;
     }
     if (!formData.armador.trim()) {
-      newErrors.armador = "Armador é obrigatório";
+      newErrors.armador = translations.carrierRequired;
     }
     if (formData.quantBox < 1) {
-      newErrors.quantBox = "Quantidade deve ser maior que 0";
+      newErrors.quantBox = translations.quantityGreaterThanZero;
     }
 
     setErrors(newErrors);
@@ -284,7 +286,7 @@ const EditShipmentModal = ({
     e.preventDefault();
 
     if (!canEdit) {
-      alert("Você não tem permissão para editar este envio.");
+      alert(translations.noPermissionEdit);
       return;
     }
 
@@ -328,7 +330,7 @@ const EditShipmentModal = ({
       onClose();
     } catch (error) {
       console.error("Erro ao salvar envio:", error);
-      alert("Erro ao salvar as alterações. Tente novamente.");
+      alert(translations.errorSavingChanges);
     } finally {
       setIsLoading(false);
     }
@@ -346,7 +348,7 @@ const EditShipmentModal = ({
         <div className="edit-modal-header">
           <h2>
             <Ship size={24} />
-            Editar Envio
+            {translations.editShipment}
           </h2>
           <button className="close-button" onClick={onClose} type="button">
             <X size={20} />
@@ -359,7 +361,7 @@ const EditShipmentModal = ({
             <div className="form-section">
               <div className="section-title">
                 <User size={18} />
-                <span>Informações do Cliente</span>
+                <span>{translations.clientInfo}</span>
               </div>
 
               <div className="form-row">
@@ -369,7 +371,7 @@ const EditShipmentModal = ({
                       size={16}
                       style={{ marginRight: "8px", verticalAlign: "middle" }}
                     />
-                    Tipo de Transporte *
+                    {translations.transportType} *
                   </label>
                   <select
                     id="tipo"
@@ -379,10 +381,10 @@ const EditShipmentModal = ({
                     disabled={!canEdit}
                     required
                   >
-                    <option value="">Selecione o tipo de transporte</option>
-                    <option value="Marítimo">Marítimo</option>
-                    <option value="Aéreo">Aéreo</option>
-                    <option value="Terrestre">Terrestre</option>
+                    <option value="">{translations.selectTransportType}</option>
+                    <option value="Marítimo">{translations.maritime}</option>
+                    <option value="Aéreo">{translations.air}</option>
+                    <option value="Terrestre">{translations.land}</option>
                   </select>
                   {errors.tipo && (
                     <span className="error-message">{errors.tipo}</span>
@@ -392,7 +394,7 @@ const EditShipmentModal = ({
 
               <div className="form-row">
                 <div className="form-group">
-                  <label htmlFor="clienteId">Cliente *</label>
+                  <label htmlFor="clienteId">{translations.client} *</label>
                   <select
                     id="clienteId"
                     name="clienteId"
@@ -403,8 +405,8 @@ const EditShipmentModal = ({
                   >
                     <option value="">
                       {loadingClientes
-                        ? "Carregando..."
-                        : "Selecione o cliente"}
+                        ? translations.loadingClients
+                        : translations.selectClient}
                     </option>
 
                     {clientes.map((cliente) => (
@@ -416,7 +418,7 @@ const EditShipmentModal = ({
                 </div>
 
                 <div className="form-group">
-                  <label htmlFor="operador">Operador *</label>
+                  <label htmlFor="operador">{translations.operator} *</label>
                   <input
                     type="text"
                     id="operador"
@@ -424,7 +426,7 @@ const EditShipmentModal = ({
                     value={formData.operador}
                     onChange={handleInputChange}
                     disabled={!canEdit}
-                    placeholder="Nome do operador"
+                    placeholder={translations.operatorPlaceholder}
                   />
                   {errors.operador && (
                     <span className="error-message">{errors.operador}</span>
@@ -434,7 +436,7 @@ const EditShipmentModal = ({
 
               <div className="form-row">
                 <div className="form-group">
-                  <label htmlFor="shipper">Shipper</label>
+                  <label htmlFor="shipper">{translations.shipper}</label>
                   <input
                     type="text"
                     id="shipper"
@@ -442,7 +444,7 @@ const EditShipmentModal = ({
                     value={formData.shipper}
                     onChange={handleInputChange}
                     disabled={!canEdit}
-                    placeholder="Nome do shipper"
+                    placeholder={translations.shipperPlaceholder}
                   />
                 </div>
               </div>
@@ -452,17 +454,17 @@ const EditShipmentModal = ({
             <div className="form-section">
               <div className="section-title">
                 <MapPin size={18} />
-                <span>Rota e Cronograma</span>
+                <span>{translations.routeAndSchedule}</span>
               </div>
 
               <div className="form-row">
                 <div className="form-group">
                   <label htmlFor="pol">
-                    {formData.tipo === "Aéreo"
-                      ? "Aeroporto de Origem"
-                      : formData.tipo === "Terrestre"
-                      ? "Local de Origem"
-                      : "Porto de Origem"}{" "}
+                    {formData.tipo === "Aéreo" || formData.tipo === "Air"
+                      ? translations.originAirport
+                      : formData.tipo === "Terrestre" || formData.tipo === "Land"
+                      ? translations.originLocation
+                      : translations.originPort}{" "}
                     (POL) *
                   </label>
                   <select
@@ -473,11 +475,11 @@ const EditShipmentModal = ({
                     disabled={!canEdit}
                   >
                     <option value="">
-                      {formData.tipo === "Aéreo"
-                        ? "Selecione o aeroporto de origem"
-                        : formData.tipo === "Terrestre"
-                        ? "Selecione o local de origem"
-                        : "Selecione o porto de origem"}
+                      {formData.tipo === "Aéreo" || formData.tipo === "Air"
+                        ? translations.selectOriginAirport
+                        : formData.tipo === "Terrestre" || formData.tipo === "Land"
+                        ? translations.selectOriginLocation
+                        : translations.selectOriginPort}
                     </option>
                     {formData.tipo === "Aéreo"
                       ? aeroportos.map((aeroporto) => (
@@ -504,11 +506,11 @@ const EditShipmentModal = ({
 
                 <div className="form-group">
                   <label htmlFor="pod">
-                    {formData.tipo === "Aéreo"
-                      ? "Aeroporto de Destino"
-                      : formData.tipo === "Terrestre"
-                      ? "Local de Destino"
-                      : "Porto de Destino"}{" "}
+                    {formData.tipo === "Aéreo" || formData.tipo === "Air"
+                      ? translations.destinationAirport
+                      : formData.tipo === "Terrestre" || formData.tipo === "Land"
+                      ? translations.destinationLocation
+                      : translations.destinationPort}{" "}
                     (POD) *
                   </label>
                   <select
@@ -519,11 +521,11 @@ const EditShipmentModal = ({
                     disabled={!canEdit}
                   >
                     <option value="">
-                      {formData.tipo === "Aéreo"
-                        ? "Selecione o aeroporto de destino"
-                        : formData.tipo === "Terrestre"
-                        ? "Selecione o local de destino"
-                        : "Selecione o porto de destino"}
+                      {formData.tipo === "Aéreo" || formData.tipo === "Air"
+                        ? translations.selectDestinationAirport
+                        : formData.tipo === "Terrestre" || formData.tipo === "Land"
+                        ? translations.selectDestinationLocation
+                        : translations.selectDestinationPort}
                     </option>
                     {formData.tipo === "Aéreo"
                       ? aeroportos.map((aeroporto) => (
@@ -551,7 +553,7 @@ const EditShipmentModal = ({
 
               <div className="form-row">
                 <div className="form-group">
-                  <label htmlFor="etdOrigem">Data de Partida (ETD) *</label>
+                  <label htmlFor="etdOrigem">{translations.departureDate} (ETD) *</label>
                   <input
                     type="date"
                     id="etdOrigem"
@@ -566,7 +568,7 @@ const EditShipmentModal = ({
                 </div>
 
                 <div className="form-group">
-                  <label htmlFor="etaDestino">Data de Chegada (ETA) *</label>
+                  <label htmlFor="etaDestino">{translations.arrivalDate} (ETA) *</label>
                   <input
                     type="date"
                     id="etaDestino"
@@ -581,11 +583,11 @@ const EditShipmentModal = ({
                 </div>
                 <div className="form-group">
                   <label htmlFor="currentLocation">
-                    {formData.tipo === "Aéreo"
-                      ? "Aeroporto Atual"
-                      : formData.tipo === "Terrestre"
-                      ? "Local Atual"
-                      : "Porto Atual"}
+                    {formData.tipo === "Aéreo" || formData.tipo === "Air"
+                      ? translations.currentAirport
+                      : formData.tipo === "Terrestre" || formData.tipo === "Land"
+                      ? translations.currentLocation
+                      : translations.currentPort}
                   </label>
                   <select
                     id="currentLocation"
@@ -595,11 +597,11 @@ const EditShipmentModal = ({
                     disabled={!canEdit}
                   >
                     <option value="">
-                      {formData.tipo === "Aéreo"
-                        ? "Selecione o aeroporto atual"
-                        : formData.tipo === "Terrestre"
-                        ? "Selecione o local atual"
-                        : "Selecione o porto atual"}
+                      {formData.tipo === "Aéreo" || formData.tipo === "Air"
+                        ? translations.selectCurrentAirport
+                        : formData.tipo === "Terrestre" || formData.tipo === "Land"
+                        ? translations.selectCurrentLocation
+                        : translations.selectCurrentPort}
                     </option>
                     {formData.tipo === "Aéreo"
                       ? aeroportos.map((aeroporto) => (
@@ -632,12 +634,12 @@ const EditShipmentModal = ({
             <div className="form-section">
               <div className="section-title">
                 <Package size={18} />
-                <span>Informações Operacionais</span>
+                <span>{translations.operationalInfo}</span>
               </div>
 
               <div className="form-row">
                 <div className="form-group">
-                  <label htmlFor="quantBox">Quantidade de Containers *</label>
+                  <label htmlFor="quantBox">{translations.containerQuantity} *</label>
                   <input
                     type="number"
                     id="quantBox"
@@ -654,7 +656,7 @@ const EditShipmentModal = ({
                 </div>
 
                 <div className="form-group">
-                  <label htmlFor="status">Status</label>
+                  <label htmlFor="status">{translations.status}</label>
                   <StatusSelector
                     currentStatus={formData.status}
                     onStatusChange={(newStatus) => {
@@ -668,7 +670,7 @@ const EditShipmentModal = ({
 
               <div className="form-row">
                 <div className="form-group">
-                  <label htmlFor="armador">Armador *</label>
+                  <label htmlFor="armador">{translations.carrier} *</label>
                   <select
                     id="armador"
                     name="armador"
@@ -676,7 +678,7 @@ const EditShipmentModal = ({
                     onChange={handleInputChange}
                     disabled={!canEdit}
                   >
-                    <option value="">Selecione um armador</option>
+                    <option value="">{translations.selectCarrier}</option>
                     {armadores.map((armador) => (
                       <option key={armador} value={armador}>
                         {armador}
@@ -694,12 +696,12 @@ const EditShipmentModal = ({
             <div className="form-section">
               <div className="section-title">
                 <FileText size={18} />
-                <span>Documentação</span>
+                <span>{translations.documentation}</span>
               </div>
 
               <div className="form-row">
                 <div className="form-group">
-                  <label htmlFor="numeroBl">Número do BL *</label>
+                  <label htmlFor="numeroBl">{translations.blNumber} *</label>
                   <input
                     type="text"
                     id="numeroBl"
@@ -707,7 +709,7 @@ const EditShipmentModal = ({
                     value={formData.numeroBl}
                     onChange={handleInputChange}
                     disabled={!canEdit}
-                    placeholder="Ex: BL123456789"
+                    placeholder={translations.blNumberPlaceholder}
                   />
                   {errors.numeroBl && (
                     <span className="error-message">{errors.numeroBl}</span>
@@ -715,7 +717,7 @@ const EditShipmentModal = ({
                 </div>
 
                 <div className="form-group">
-                  <label htmlFor="booking">Número do Booking *</label>
+                  <label htmlFor="booking">{translations.bookingNumber} *</label>
                   <input
                     type="text"
                     id="booking"
@@ -723,7 +725,7 @@ const EditShipmentModal = ({
                     value={formData.booking}
                     onChange={handleInputChange}
                     disabled={!canEdit}
-                    placeholder="Ex: BK987654321"
+                    placeholder={translations.bookingNumberPlaceholder}
                   />
                   {errors.booking && (
                     <span className="error-message">{errors.booking}</span>
@@ -733,7 +735,7 @@ const EditShipmentModal = ({
 
               <div className="form-row">
                 <div className="form-group">
-                  <label htmlFor="invoice">Número do Invoice *</label>
+                  <label htmlFor="invoice">{translations.invoiceNumber} *</label>
                   <input
                     type="text"
                     id="invoice"
@@ -741,7 +743,7 @@ const EditShipmentModal = ({
                     value={formData.invoice}
                     onChange={handleInputChange}
                     disabled={!canEdit}
-                    placeholder="Ex: INV123456"
+                    placeholder={translations.invoiceNumberPlaceholder}
                   />
                   {errors.invoice && (
                     <span className="error-message">{errors.invoice}</span>
@@ -751,14 +753,14 @@ const EditShipmentModal = ({
 
               <div className="form-row">
                 <div className="form-group full-width">
-                  <label htmlFor="observacoes">Observações</label>
+                  <label htmlFor="observacoes">{translations.observations}</label>
                   <textarea
                     id="observacoes"
                     name="observacoes"
                     value={formData.observacoes}
                     onChange={handleInputChange}
                     disabled={!canEdit}
-                    placeholder="Digite observações sobre o envio..."
+                    placeholder={translations.observationsPlaceholder}
                     rows={4}
                   />
                 </div>
@@ -774,7 +776,7 @@ const EditShipmentModal = ({
             onClick={onClose}
             disabled={isLoading}
           >
-            Cancelar
+            {translations.cancel}
           </button>
           {canEdit && (
             <button
@@ -784,7 +786,7 @@ const EditShipmentModal = ({
               disabled={isLoading}
             >
               <Save size={16} />
-              {isLoading ? "Salvando..." : "Salvar Alterações"}
+              {isLoading ? translations.saving : translations.saveChanges}
             </button>
           )}
         </div>

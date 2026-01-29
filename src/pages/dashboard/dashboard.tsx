@@ -16,9 +16,12 @@ import { useNavigate } from "react-router-dom";
 import ChatAssistant from "../../components/chat-assistant/chat-assistant";
 import { DashboardCharts } from "../../components/dashboard-charts";
 import Navbar from "../../components/navbar/navbar";
+import { StatCardSkeleton } from "../../components/skeleton-loader/skeleton-loader";
+import { Tooltip } from "../../components/tooltip/tooltip";
 import { useAuth } from "../../context/auth-context";
 import { useLanguage } from "../../context/language-context";
 import { type Shipment, useShipments } from "../../context/shipments-context";
+import "../../utils/animations.css";
 import "./user-dashboard.css";
 
 interface DashboardStats {
@@ -200,10 +203,28 @@ export const Dashboard = () => {
     return (
       <main className="dashboard-container">
         <Navbar />
-        <div className="dashboard-content">
-          <div className="loading-message">
-            {loading ? translations.loading : translations.redirecting}
-          </div>
+        <div className="dashboard-content fade-in">
+          {loading ? (
+            <>
+              <div className="dashboard-header">
+                <h1>{translations.dashboard}</h1>
+                <p>{translations.welcomeUser} {currentUser?.displayName}!</p>
+              </div>
+              <div className="stats-section">
+                <h2 className="section-title">{translations.overview}</h2>
+                <div className="stats-grid">
+                  <StatCardSkeleton />
+                  <StatCardSkeleton />
+                  <StatCardSkeleton />
+                  <StatCardSkeleton />
+                </div>
+              </div>
+            </>
+          ) : (
+            <div className="loading-message">
+              {translations.redirecting}
+            </div>
+          )}
         </div>
         <ChatAssistant />
       </main>

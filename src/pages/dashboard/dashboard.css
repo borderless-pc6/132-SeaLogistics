@@ -36,6 +36,31 @@
   margin: 0;
 }
 
+.export-pdf-button {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 12px 20px;
+  background: linear-gradient(135deg, #789170 0%, #5a7a5a 100%);
+  color: white;
+  border: none;
+  border-radius: 8px;
+  cursor: pointer;
+  font-size: 14px;
+  font-weight: 500;
+  box-shadow: 0 4px 12px rgba(120, 145, 112, 0.3);
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.export-pdf-button:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 6px 16px rgba(120, 145, 112, 0.4);
+}
+
+.export-pdf-button:active {
+  transform: translateY(0);
+}
+
 .loading-message {
   display: flex;
   align-items: center;

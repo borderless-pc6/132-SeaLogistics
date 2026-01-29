@@ -1,23 +1,24 @@
-"use client";
+  "use client";
 
 import { doc, getDoc, updateDoc } from "firebase/firestore";
-import { Bell, Globe, MessageCircle, Save, User } from "lucide-react";
+import { Bell, MessageCircle, Save, User } from "lucide-react";
 import { useContext, useEffect, useState } from "react";
 import ChatAssistant from "../../components/chat-assistant/chat-assistant";
 import Navbar from "../../components/navbar/navbar";
 import { NavbarContext } from "../../components/navbar/navbar-context";
 import { useAuth } from "../../context/auth-context";
-import { LanguageProvider } from "../../context/language-context";
+import { LanguageProvider, useLanguage } from "../../context/language-context";
 import { useToast } from "../../context/toast-context";
 import { db } from "../../lib/firebaseConfig";
 import type { UserSettings } from "../../types/user";
 import { UserRole } from "../../types/user";
 import "./Settings.css";
 
-export const Settings = () => {
+const SettingsContent = () => {
   const { isCollapsed } = useContext(NavbarContext);
-  const { currentUser: authUser, isCompanyUser } = useAuth();
+  const { currentUser: authUser } = useAuth();
   const { showToast } = useToast();
+  const { translations } = useLanguage();
 
   // Obter dados do usuário logado
   const getCurrentUser = () => {
@@ -25,7 +26,7 @@ export const Settings = () => {
       return {
         id: authUser.uid,
         email: authUser.email,
-        name: authUser.displayName || "Usuário",
+        name: authUser.displayName || translations.user,
         role: authUser.role,
       };
     }
@@ -36,7 +37,7 @@ export const Settings = () => {
       : {
           id: "demo-user-123",
           email: "demo@sealogistics.com",
-          name: "Usuário Demo",
+          name: translations.demoUser,
         };
   };
 
@@ -91,7 +92,7 @@ export const Settings = () => {
       } else {
         // Se não existe documento do usuário, criar um inicial
         const initialUserData = {
-          name: currentUser.name || "Usuário Demo",
+          name: currentUser.name || translations.demoUser,
           email: currentUser.email || "demo@sealogistics.com",
           phone: "",
           company: "",
@@ -108,12 +109,12 @@ export const Settings = () => {
         }));
       }
     } catch (error) {
-      console.error("Erro ao carregar configurações:", error);
-      // Se o documento não existe, vamos criá-lo
-      try {
-        const initialUserData = {
-          name: currentUser.name || "Usuário Demo",
-          email: currentUser.email || "demo@sealogistics.com",
+      console.error(translations.errorLoadingSettings, error);
+        // Se o documento não existe, vamos criá-lo
+        try {
+          const initialUserData = {
+            name: currentUser.name || translations.demoUser,
+            email: currentUser.email || "demo@sealogistics.com",
           phone: "",
           company: "",
           position: "",
@@ -128,7 +129,7 @@ export const Settings = () => {
           ...initialUserData,
         }));
       } catch (createError) {
-        console.error("Erro ao criar documento do usuário:", createError);
+        console.error(translations.errorCreatingUserDoc, createError);
       }
     } finally {
       setIsLoading(false);
@@ -206,10 +207,10 @@ export const Settings = () => {
         updatedAt: new Date(),
       });
 
-      showToast("Configurações salvas com sucesso!", "success");
+      showToast(translations.settingsSavedSuccess, "success");
     } catch (error) {
-      console.error("Erro ao salvar configurações:", error);
-      showToast("Erro ao salvar configurações. Tente novamente.", "error");
+      console.error(translations.errorSavingSettings, error);
+      showToast(translations.errorSavingSettings, "error");
     } finally {
       setIsSaving(false);
     }
@@ -225,7 +226,7 @@ export const Settings = () => {
               isCollapsed ? "navbar-collapsed" : ""
             }`}
           >
-            <div className="loading-message">Carregando configurações...</div>
+            <div className="loading-message">{translations.loadingSettings}</div>
           </div>
           <ChatAssistant />
         </main>
@@ -244,8 +245,8 @@ export const Settings = () => {
         >
           <div className="settings-wrapper">
             <div className="settings-header">
-              <h1>Configurações da conta</h1>
-              <p>Gerencie suas informações pessoais e preferências</p>
+              <h1>{translations.accountSettings}</h1>
+              <p>{translations.managePersonalInfo}</p>
             </div>
 
             <div className="settings-sections">
@@ -253,12 +254,12 @@ export const Settings = () => {
               <div className="settings-section">
                 <div className="section-header">
                   <User size={20} />
-                  <h2>Informações Pessoais</h2>
+                  <h2>{translations.personalInformation}</h2>
                 </div>
 
                 <div className="form-grid">
                   <div className="form-group">
-                    <label htmlFor="name">Nome Completo</label>
+                    <label htmlFor="name">{translations.fullName}</label>
                     <input
                       type="text"
                       id="name"
@@ -266,12 +267,12 @@ export const Settings = () => {
                       onChange={(e) =>
                         handleInputChange("name", e.target.value)
                       }
-                      placeholder="Digite seu nome completo"
+                      placeholder={translations.fullNamePlaceholder}
                     />
                   </div>
 
                   <div className="form-group">
-                    <label htmlFor="email">E-mail</label>
+                    <label htmlFor="email">{translations.emailLabel}</label>
                     <input
                       type="email"
                       id="email"
@@ -285,7 +286,7 @@ export const Settings = () => {
                   </div>
 
                   <div className="form-group">
-                    <label htmlFor="phone">Telefone</label>
+                    <label htmlFor="phone">{translations.phone}</label>
                     <input
                       type="tel"
                       id="phone"
@@ -293,7 +294,7 @@ export const Settings = () => {
                       onChange={(e) =>
                         handlePhoneChange("phone", e.target.value)
                       }
-                      placeholder="(11) 99999-9999"
+                      placeholder={translations.phonePlaceholder}
                       maxLength={15}
                     />
                   </div>
@@ -302,9 +303,9 @@ export const Settings = () => {
                   {currentUser.role === UserRole.COMPANY_USER && (
                     <div className="form-group">
                       <label htmlFor="whatsappPhone">
-                        WhatsApp{" "}
+                        {translations.whatsapp}{" "}
                         <span style={{ fontSize: "0.85rem", color: "#888" }}>
-                          (para notificações)
+                          {translations.whatsappForNotifications}
                         </span>
                       </label>
                       <input
@@ -314,17 +315,17 @@ export const Settings = () => {
                         onChange={(e) =>
                           handlePhoneChange("whatsappPhone", e.target.value)
                         }
-                        placeholder="(11) 99999-9999"
+                        placeholder={translations.phonePlaceholder}
                         maxLength={15}
                       />
                       <small style={{ color: "#666", fontSize: "0.85rem" }}>
-                        Formato: (DD) 9XXXX-XXXX ou (DD) XXXXX-XXXX
+                        {translations.whatsappFormat}
                       </small>
                     </div>
                   )}
 
                   <div className="form-group">
-                    <label htmlFor="company">Empresa</label>
+                    <label htmlFor="company">{translations.company}</label>
                     <input
                       type="text"
                       id="company"
@@ -332,12 +333,12 @@ export const Settings = () => {
                       onChange={(e) =>
                         handleInputChange("company", e.target.value)
                       }
-                      placeholder="Nome da empresa"
+                      placeholder={translations.companyPlaceholder}
                     />
                   </div>
 
                   <div className="form-group">
-                    <label htmlFor="position">Cargo</label>
+                    <label htmlFor="position">{translations.position}</label>
                     <input
                       type="text"
                       id="position"
@@ -345,7 +346,7 @@ export const Settings = () => {
                       onChange={(e) =>
                         handleInputChange("position", e.target.value)
                       }
-                      placeholder="Seu cargo na empresa"
+                      placeholder={translations.positionPlaceholder}
                     />
                   </div>
                 </div>
@@ -355,7 +356,7 @@ export const Settings = () => {
               <div className="settings-section">
                 <div className="section-header">
                   <Bell size={20} />
-                  <h2>Notificações</h2>
+                  <h2>{translations.notifications}</h2>
                 </div>
 
                 {/* Canais de Notificação - apenas para COMPANY_USER */}
@@ -370,7 +371,7 @@ export const Settings = () => {
                           fontWeight: 600,
                         }}
                       >
-                        Canais de Notificação
+                        {translations.notificationChannels}
                       </h3>
                       <p
                         style={{
@@ -379,16 +380,15 @@ export const Settings = () => {
                           marginBottom: "1rem",
                         }}
                       >
-                        Escolha como deseja receber notificações sobre seus
-                        envios
+                        {translations.chooseNotificationMethod}
                       </p>
                     </div>
 
                     <div className="notification-settings">
                       <div className="notification-item">
                         <div className="notification-info">
-                          <h3>📧 Notificações por E-mail</h3>
-                          <p>Receba atualizações importantes por e-mail</p>
+                          <h3>📧 {translations.emailNotifications}</h3>
+                          <p>{translations.receiveImportantUpdates}</p>
                         </div>
                         <label className="switch">
                           <input
@@ -410,13 +410,13 @@ export const Settings = () => {
                         <div className="notification-info">
                           <h3 style={{ display: "flex", alignItems: "center", gap: "0.5rem" }}>
                             <MessageCircle size={18} />
-                            Notificações por WhatsApp
+                            {translations.whatsappNotifications}
                           </h3>
                           <p>
-                            Receba atualizações em tempo real no WhatsApp
+                            {translations.receiveRealTimeWhatsapp}
                             {!userSettings.whatsappPhone && (
                               <span style={{ color: "#e74c3c", marginLeft: "0.5rem" }}>
-                                (configure seu número acima)
+                                {translations.configureNumberAbove}
                               </span>
                             )}
                           </p>
@@ -448,7 +448,7 @@ export const Settings = () => {
                           fontWeight: 600,
                         }}
                       >
-                        Tipos de Notificação
+                        {translations.notificationTypes}
                       </h3>
                     </div>
                   </>
@@ -460,8 +460,8 @@ export const Settings = () => {
                     <>
                       <div className="notification-item">
                         <div className="notification-info">
-                          <h3>Notificações por E-mail</h3>
-                          <p>Receba atualizações importantes por e-mail</p>
+                          <h3>{translations.emailNotifications}</h3>
+                          <p>{translations.receiveImportantUpdates}</p>
                         </div>
                         <label className="switch">
                           <input
@@ -481,8 +481,8 @@ export const Settings = () => {
 
                       <div className="notification-item">
                         <div className="notification-info">
-                          <h3>Notificações Push</h3>
-                          <p>Receba notificações em tempo real no navegador</p>
+                          <h3>{translations.pushNotifications}</h3>
+                          <p>{translations.receiveRealTimeBrowser}</p>
                         </div>
                         <label className="switch">
                           <input
@@ -504,8 +504,8 @@ export const Settings = () => {
 
                   <div className="notification-item">
                     <div className="notification-info">
-                      <h3>Atualizações de Status</h3>
-                      <p>Seja notificado quando o status dos envios mudar</p>
+                      <h3>{translations.statusUpdates}</h3>
+                      <p>{translations.notifiedWhenStatusChanges}</p>
                     </div>
                     <label className="switch">
                       <input
@@ -525,8 +525,8 @@ export const Settings = () => {
 
                   <div className="notification-item">
                     <div className="notification-info">
-                      <h3>Novos Envios</h3>
-                      <p>Receba notificações sobre novos envios criados</p>
+                      <h3>{translations.newShipments}</h3>
+                      <p>{translations.receiveNewShipmentNotifications}</p>
                     </div>
                     <label className="switch">
                       <input
@@ -545,97 +545,6 @@ export const Settings = () => {
                   </div>
                 </div>
               </div>
-
-              {/* Preferências */}
-              <div className="settings-section">
-                <div className="section-header">
-                  <Globe size={20} />
-                  <h2>Preferências</h2>
-                </div>
-
-                <div className="form-grid">
-                  <div className="form-group">
-                    <label htmlFor="language">Idioma</label>
-                    <select
-                      id="language"
-                      value={userSettings.preferences.language}
-                      onChange={(e) =>
-                        handleNestedChange(
-                          "preferences",
-                          "language",
-                          e.target.value
-                        )
-                      }
-                    >
-                      <option value="pt">Português</option>
-                      <option value="en">English</option>
-                      <option value="es">Español</option>
-                    </select>
-                  </div>
-
-                  <div className="form-group">
-                    <label htmlFor="timezone">Fuso Horário</label>
-                    <select
-                      id="timezone"
-                      value={userSettings.preferences.timezone}
-                      onChange={(e) =>
-                        handleNestedChange(
-                          "preferences",
-                          "timezone",
-                          e.target.value
-                        )
-                      }
-                    >
-                      <option value="America/Sao_Paulo">
-                        São Paulo (UTC-3)
-                      </option>
-                      <option value="America/New_York">
-                        Nova York (UTC-5)
-                      </option>
-                      <option value="Europe/London">Londres (UTC+0)</option>
-                      <option value="Asia/Shanghai">Xangai (UTC+8)</option>
-                    </select>
-                  </div>
-
-                  <div className="form-group">
-                    <label htmlFor="dateFormat">Formato de Data</label>
-                    <select
-                      id="dateFormat"
-                      value={userSettings.preferences.dateFormat}
-                      onChange={(e) =>
-                        handleNestedChange(
-                          "preferences",
-                          "dateFormat",
-                          e.target.value
-                        )
-                      }
-                    >
-                      <option value="DD/MM/YYYY">DD/MM/AAAA</option>
-                      <option value="MM/DD/YYYY">MM/DD/AAAA</option>
-                      <option value="YYYY-MM-DD">AAAA-MM-DD</option>
-                    </select>
-                  </div>
-
-                  <div className="form-group">
-                    <label htmlFor="theme">Tema</label>
-                    <select
-                      id="theme"
-                      value={userSettings.preferences.theme}
-                      onChange={(e) =>
-                        handleNestedChange(
-                          "preferences",
-                          "theme",
-                          e.target.value
-                        )
-                      }
-                    >
-                      <option value="light">Claro</option>
-                      <option value="dark">Escuro</option>
-                      <option value="auto">Automático</option>
-                    </select>
-                  </div>
-                </div>
-              </div>
             </div>
 
             {/* Botão Salvar */}
@@ -646,13 +555,21 @@ export const Settings = () => {
                 disabled={isSaving}
               >
                 <Save size={16} />
-                {isSaving ? "Salvando..." : "Salvar Configurações"}
+                {isSaving ? translations.saving : translations.saveSettings}
               </button>
             </div>
           </div>
         </div>
         <ChatAssistant />
       </main>
+    </LanguageProvider>
+  );
+};
+
+export const Settings = () => {
+  return (
+    <LanguageProvider>
+      <SettingsContent />
     </LanguageProvider>
   );
 };

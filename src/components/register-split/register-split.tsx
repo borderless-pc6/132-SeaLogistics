@@ -18,6 +18,7 @@ import { useToast } from "../../context/toast-context";
 import { db } from "../../lib/firebaseConfig";
 import { createRegisterSchema } from "../../schemas/registerSchema";
 import { type userCredentials, UserRole } from "../../types/user";
+import { hashPassword } from "../../utils/passwordUtils";
 import { PasswordStrengthIndicator } from "../password-strength-indicator";
 import LanguageSwitcher from "../language-switcher/language-switcher";
 import logo2 from "./../../assets/logo2.png";
@@ -97,7 +98,7 @@ export default function RegisterSplit() {
 
     // Validar formulário completo
     if (!validateForm(userCredentials)) {
-      showError('Por favor, corrija os erros no formulário');
+      showError(translations.pleaseFixFormErrors);
       return;
     }
 
@@ -111,11 +112,15 @@ export default function RegisterSplit() {
         companyId = await findOrCreateCompany(companyName, companyCode);
       }
 
+      // Gerar hash da senha
+      const passwordHash = await hashPassword(password);
+
       // Preparar dados do usuário baseado no role
       const baseUserData = {
         uid: userId,
         displayName: name ?? "",
         email,
+        passwordHash, // Armazenar hash da senha
         role,
         isActive: true,
         createdAt: new Date(),
@@ -139,19 +144,19 @@ export default function RegisterSplit() {
         "currentUser",
         JSON.stringify({
           email,
-          name: name ?? "Usuário",
+          name: name ?? translations.user,
           id: userId,
           role,
         })
       );
 
       console.log("Usuário cadastrado com sucesso");
-      showSuccess('Conta criada com sucesso!');
+      showSuccess(translations.accountCreatedSuccess);
       clearAllErrors();
       navigate("/home");
     } catch (err) {
       console.error("Erro ao cadastrar:", err);
-      showError("Erro ao cadastrar. Verifique os dados e tente novamente.");
+      showError(translations.registrationError);
     }
   };
 
@@ -181,7 +186,7 @@ export default function RegisterSplit() {
 
         {/* Seletor de tipo de usuário */}
         <div className="split-form-group">
-          <label>Tipo de Usuário</label>
+          <label>{translations.userType}</label>
           <div className="user-type-selector">
             <label className="radio-option">
               <input
@@ -196,7 +201,7 @@ export default function RegisterSplit() {
                   });
                 }}
               />
-              Usuário de Empresa
+              {translations.companyUser}
             </label>
             <label className="radio-option">
               <input
@@ -211,7 +216,7 @@ export default function RegisterSplit() {
                   });
                 }}
               />
-              Administrador
+              {translations.administrator}
             </label>
           </div>
         </div>
@@ -259,7 +264,7 @@ export default function RegisterSplit() {
           {!isCreatingAdmin && (
             <>
               <div className="split-form-group">
-                <label htmlFor="companyName">Nome da Empresa</label>
+                <label htmlFor="companyName">{translations.companyName}</label>
                 <input
                   id="companyName"
                   value={userCredentials.companyName}
@@ -270,7 +275,7 @@ export default function RegisterSplit() {
                     })
                   }
                   onBlur={() => handleBlur('companyName')}
-                  placeholder="Digite o nome da sua empresa"
+                  placeholder={translations.companyNamePlaceholder}
                   className={errors.companyName ? 'input-error' : ''}
                   required={!isCreatingAdmin}
                 />
@@ -280,7 +285,7 @@ export default function RegisterSplit() {
               </div>
 
               <div className="split-form-group">
-                <label htmlFor="companyCode">Código da Empresa</label>
+                <label htmlFor="companyCode">{translations.companyCode}</label>
                 <input
                   id="companyCode"
                   value={userCredentials.companyCode}
@@ -291,11 +296,11 @@ export default function RegisterSplit() {
                     })
                   }
                   onBlur={() => handleBlur('companyCode')}
-                  placeholder="Ex: LOG001"
+                  placeholder={translations.companyCodePlaceholder}
                   className={errors.companyCode ? 'input-error' : ''}
                   required={!isCreatingAdmin}
                 />
-                <small>Código único para identificar sua empresa</small>
+                <small>{translations.companyCodeHint}</small>
                 {errors.companyCode && (
                   <p className="error-text">{errors.companyCode}</p>
                 )}

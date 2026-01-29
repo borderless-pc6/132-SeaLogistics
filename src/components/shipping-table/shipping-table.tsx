@@ -3,16 +3,20 @@
 import { doc, getDoc } from "firebase/firestore";
 import jsPDF from "jspdf";
 import "jspdf-autotable";
-import { Check, Edit, Eye, FileText, FolderOpen } from "lucide-react";
+import { Check, Edit, Eye, FileText, FolderOpen, Ship } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 import { useAuth } from "../../context/auth-context";
 import { useLanguage } from "../../context/language-context";
 import { useShipments, type Shipment } from "../../context/shipments-context";
 import { db } from "../../lib/firebaseConfig";
 import { sendEmail } from "../../services/emailService";
+import { EmptyState } from "../empty-state/empty-state";
 import { DocumentManager } from "../document-manager";
 import { DocumentViewer } from "../document-viewer";
 import EditShipmentModal from "../edit-shipment-modal/edit-shipment-modal";
+import { TableSkeleton } from "../skeleton-loader/skeleton-loader";
+import { Tooltip } from "../tooltip/tooltip";
+import "../../utils/animations.css";
 import { DropdownProvider } from "./dropdown-context";
 import ShippingFilters, { type FilterOptions } from "./shipping-filters";
 import "./shipping-table.css";
@@ -265,7 +269,7 @@ const ShippingTable = ({
       }
       handleCloseEditModal();
     } catch (error) {
-      console.error("Erro ao salvar envio:", error);
+      console.error(translations.errorSavingShipment, error);
     }
   };
 
@@ -501,9 +505,11 @@ const ShippingTable = ({
 
   if (loading) {
     return (
-      <div className="shipping-table-container">
-        <h2 className="shipping-table-title">{translations.shippingTable}</h2>
-        <div className="shipping-table-empty">{translations.loading}</div>
+      <div className="shipping-table-container fade-in">
+        <div className="shipping-table-header">
+          <h2 className="shipping-table-title">{translations.shippingTable}</h2>
+        </div>
+        <TableSkeleton rows={8} columns={15} />
       </div>
     );
   }
@@ -522,11 +528,23 @@ const ShippingTable = ({
         />
 
         {filteredAndSortedShipments.length === 0 ? (
-          <div className="shipping-table-empty">
-            {shipments.length === 0
-              ? translations.noShipments
-              : translations.noShipments}
-          </div>
+          <EmptyState
+            icon={Ship}
+            title={translations.noShipments}
+            description={
+              shipments.length === 0
+                ? "Não há envios cadastrados no sistema ainda."
+                : "Nenhum envio encontrado com os filtros aplicados. Tente ajustar os filtros de busca."
+            }
+            action={
+              shipments.length === 0
+                ? undefined
+                : {
+                    label: translations.clearFilters || "Limpar Filtros",
+                    onClick: handleClearFilters,
+                  }
+            }
+          />
         ) : (
           <div className="table-wrapper">
             <table className="shipping-table">
@@ -544,9 +562,9 @@ const ShippingTable = ({
                   <th>{translations.blNumber}</th>
                   <th>{translations.carrier}</th>
                   <th>{translations.booking}</th>
-                  <th>{"Invoice"}</th>
+                  <th>{translations.invoice}</th>
                   <th>{translations.status || "Status"}</th>
-                  <th>{"IMO"}</th>
+                  <th>{translations.imo}</th>
                   <th>{translations.actions}</th>
                 </tr>
               </thead>
@@ -590,60 +608,65 @@ const ShippingTable = ({
                       <div className="action-icons">
                         {isAdmin() && (
                           <>
-                            <button
-                              className="action-icon edit-icon"
-                              onClick={() => handleEditShipment(shipment)}
-                              title={translations.edit}
-                              disabled={!canEditShipment(shipment)}
-                            >
-                              <Edit size={20} />
-                            </button>
-                            <button
-                              className="action-icon documents-icon"
-                              onClick={() => handleManageDocuments(shipment)}
-                              title={translations.manageDocuments}
-                            >
-                              <FolderOpen size={20} />
-                            </button>
-                            <button
-                              className="action-icon check-icon"
-                              onClick={async () => {
-                                try {
-                                  await sendShipmentEmail(shipment);
-                                } catch (err) {
-                                  console.error(
-                                    "Erro ao exportar ou enviar email:",
-                                    err
-                                  );
-                                }
-                              }}
-                              title="Enviar informações para o cliente"
-                            >
-                              <Check size={20} />
-                            </button>
+                            <Tooltip content={translations.edit}>
+                              <button
+                                className="action-icon edit-icon smooth-transition"
+                                onClick={() => handleEditShipment(shipment)}
+                                disabled={!canEditShipment(shipment)}
+                              >
+                                <Edit size={20} />
+                              </button>
+                            </Tooltip>
+                            <Tooltip content={translations.manageDocuments}>
+                              <button
+                                className="action-icon documents-icon smooth-transition"
+                                onClick={() => handleManageDocuments(shipment)}
+                              >
+                                <FolderOpen size={20} />
+                              </button>
+                            </Tooltip>
+                            <Tooltip content={translations.sendInfoToClient}>
+                              <button
+                                className="action-icon check-icon smooth-transition"
+                                onClick={async () => {
+                                  try {
+                                    await sendShipmentEmail(shipment);
+                                  } catch (err) {
+                                    console.error(
+                                      "Erro ao exportar ou enviar email:",
+                                      err
+                                    );
+                                  }
+                                }}
+                              >
+                                <Check size={20} />
+                              </button>
+                            </Tooltip>
                           </>
                         )}
 
                         {!isAdmin() && (
-                          <button
-                            className="action-icon view-documents-icon"
-                            onClick={() => {
-                              setSelectedShipmentForViewer(shipment);
-                              setShowDocumentViewer(true);
-                            }}
-                            title={translations.viewDocuments}
-                          >
-                            <Eye size={20} />
-                          </button>
+                          <Tooltip content={translations.viewDocuments}>
+                            <button
+                              className="action-icon view-documents-icon smooth-transition"
+                              onClick={() => {
+                                setSelectedShipmentForViewer(shipment);
+                                setShowDocumentViewer(true);
+                              }}
+                            >
+                              <Eye size={20} />
+                            </button>
+                          </Tooltip>
                         )}
 
-                        <button
-                          className="action-icon export-icon"
-                          onClick={() => exportToPDF(shipment)}
-                          title="Exportar para PDF"
-                        >
-                          <FileText size={20} />
-                        </button>
+                        <Tooltip content={translations.exportToPDF}>
+                          <button
+                            className="action-icon export-icon smooth-transition"
+                            onClick={() => exportToPDF(shipment)}
+                          >
+                            <FileText size={20} />
+                          </button>
+                        </Tooltip>
                       </div>
                     </td>
                   </tr>
@@ -655,7 +678,7 @@ const ShippingTable = ({
                 onClick={() => setCurrentPage((p) => Math.max(1, p - 1))}
                 disabled={currentPage === 1}
               >
-                Anterior
+                {translations.previous}
               </button>
 
               {generatePages().map((pg, index) => (
@@ -675,7 +698,7 @@ const ShippingTable = ({
                 }
                 disabled={currentPage === totalPages}
               >
-                Próximo
+                {translations.next}
               </button>
 
               <select
@@ -695,8 +718,9 @@ const ShippingTable = ({
 
         {filteredAndSortedShipments.length > 0 && (
           <div className="table-summary">
-            Mostrando {filteredAndSortedShipments.length} de {shipments.length}{" "}
-            envios
+            {translations.showingXofY
+              .replace("{count}", filteredAndSortedShipments.length.toString())
+              .replace("{total}", shipments.length.toString())}
           </div>
         )}
 

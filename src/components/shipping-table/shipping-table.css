@@ -96,8 +96,13 @@
   background-color: rgba(49, 88, 81, 0.03);
 }
 
+.shipping-table tbody tr {
+  transition: background-color 0.2s ease, transform 0.2s ease;
+}
+
 .shipping-table tbody tr:hover {
   background-color: #f0f8ff;
+  transform: scale(1.01);
   transform: translateY(-1px);
   box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
 }
@@ -194,9 +199,9 @@
   width: 36px;
   height: 36px;
   border: none;
-  border-radius: 6px;
+  border-radius: 8px;
   cursor: pointer;
-  transition: all 0.2s ease;
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
   background: transparent;
   position: relative;
   z-index: 100;
@@ -204,8 +209,12 @@
 }
 
 .action-icon:hover:not(:disabled) {
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15);
-  transform: scale(1.05);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2);
+  transform: translateY(-2px) scale(1.1);
+}
+
+.action-icon:active:not(:disabled) {
+  transform: translateY(0) scale(1.05);
 }
 
 .action-icon:disabled {
@@ -269,6 +278,18 @@
 .file-icon:hover:not(:disabled) {
   background: #5a32a3;
   border-color: #4c2d8a;
+}
+
+.export-icon {
+  color: #ffffff;
+  background: #dc3545;
+  border: 1px solid #dc3545;
+}
+
+.export-icon:hover:not(:disabled) {
+  background: #c82333;
+  border-color: #bd2130;
+  box-shadow: 0 4px 12px rgba(220, 53, 69, 0.3);
 }
 
 .tipo-badge {

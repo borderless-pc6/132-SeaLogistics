@@ -12,9 +12,11 @@ import { UserPlus } from "lucide-react";
 import type React from "react";
 import { useEffect, useState } from "react";
 import { useAuth } from "../../context/auth-context";
+import { useLanguage } from "../../context/language-context";
 import type { Shipment } from "../../context/shipments-context";
 import { db } from "../../lib/firebaseConfig";
 import { type Company, type User, UserRole } from "../../types/user";
+import { hashPassword } from "../../utils/passwordUtils";
 import "./admin-panel.css";
 
 interface AdminPanelProps {
@@ -24,6 +26,7 @@ interface AdminPanelProps {
 
 export const AdminPanel: React.FC<AdminPanelProps> = ({ onClose, initialTab }) => {
   const { isAdmin } = useAuth();
+  const { translations } = useLanguage();
   const [users, setUsers] = useState<User[]>([]);
   const [companies, setCompanies] = useState<Company[]>([]);
   const [shipments, setShipments] = useState<Shipment[]>([]);
@@ -124,7 +127,7 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({ onClose, initialTab }) =
       );
     } catch (error) {
       console.error("Error updating user status:", error);
-      alert("Erro ao atualizar status do usuário");
+      alert(translations.errorUpdatingUserStatus);
     }
   };
 
@@ -147,7 +150,7 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({ onClose, initialTab }) =
       );
     } catch (error) {
       console.error("Error updating company status:", error);
-      alert("Erro ao atualizar status da empresa");
+      alert(translations.errorUpdatingCompanyStatus);
     }
   };
 
@@ -173,26 +176,26 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({ onClose, initialTab }) =
       );
     } catch (error) {
       console.error("Error assigning shipment:", error);
-      alert("Erro ao atribuir shipment à empresa");
+      alert(translations.errorAssigningShipment);
     }
   };
 
   const deleteUser = async (userId: string) => {
-    if (!confirm("Tem certeza que deseja excluir este usuário?")) return;
+    if (!confirm(translations.confirmDeleteUser)) return;
 
     try {
       await deleteDoc(doc(db, "users", userId));
       setUsers(users.filter((user) => user.uid !== userId));
     } catch (error) {
       console.error("Error deleting user:", error);
-      alert("Erro ao excluir usuário");
+      alert(translations.errorDeletingUser);
     }
   };
 
   const getCompanyName = (companyId?: string) => {
-    if (!companyId) return "Não atribuído";
+    if (!companyId) return translations.notAssigned;
     const company = companies.find((c) => c.id === companyId);
-    return company ? company.name : "Empresa não encontrada";
+    return company ? company.name : translations.companyLabel + " não encontrada";
   };
 
   const handleCreateUser = async () => {
@@ -200,32 +203,32 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({ onClose, initialTab }) =
     const errors: any = {};
 
     if (!newUserData.name.trim()) {
-      errors.name = "Nome é obrigatório";
+      errors.name = translations.nameRequired;
     }
 
     if (!newUserData.email.trim()) {
-      errors.email = "Email é obrigatório";
+      errors.email = translations.emailRequired;
     } else if (!/\S+@\S+\.\S+/.test(newUserData.email)) {
-      errors.email = "Email inválido";
+      errors.email = translations.invalidEmail;
     }
 
     if (!newUserData.password) {
-      errors.password = "Senha é obrigatória";
+      errors.password = translations.passwordRequired;
     } else if (newUserData.password.length < 6) {
-      errors.password = "Senha deve ter pelo menos 6 caracteres";
+      errors.password = translations.passwordMinLength;
     }
 
     if (newUserData.password !== newUserData.confirmPassword) {
-      errors.confirmPassword = "Senhas não coincidem";
+      errors.confirmPassword = translations.passwordsDontMatch;
     }
 
     // Validações específicas para usuários de empresa
     if (newUserData.role === UserRole.COMPANY_USER) {
       if (!newUserData.companyName.trim()) {
-        errors.companyName = "Nome da empresa é obrigatório";
+        errors.companyName = translations.companyNameRequired;
       }
       if (!newUserData.companyCode.trim()) {
-        errors.companyCode = "Código da empresa é obrigatório";
+        errors.companyCode = translations.companyCodeRequired;
       }
     }
 
@@ -241,7 +244,7 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({ onClose, initialTab }) =
       // Verificar se email já existe
       const existingUser = users.find((u) => u.email === newUserData.email);
       if (existingUser) {
-        alert("Este email já está em uso");
+        alert(translations.emailAlreadyInUse);
         return;
       }
 
@@ -287,11 +290,15 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({ onClose, initialTab }) =
         }
       }
 
+      // Gerar hash da senha
+      const passwordHash = await hashPassword(newUserData.password);
+
       // Preparar dados do usuário
       const baseUserData = {
         uid: userId,
         displayName: newUserData.name,
         email: newUserData.email,
+        passwordHash, // Armazenar hash da senha
         role: newUserData.role,
         isActive: true,
         createdAt: new Date(),
@@ -326,10 +333,10 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({ onClose, initialTab }) =
       });
       setShowCreateUserModal(false);
 
-      alert("Usuário criado com sucesso!");
+      alert(translations.userCreatedSuccess);
     } catch (error) {
       console.error("Erro ao criar usuário:", error);
-      alert("Erro ao criar usuário. Tente novamente.");
+      alert(translations.errorCreatingUser);
     } finally {
       setIsCreatingUser(false);
     }
@@ -353,9 +360,9 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({ onClose, initialTab }) =
     return (
       <div className="admin-panel">
         <div className="admin-panel-content">
-          <h2>Acesso Negado</h2>
-          <p>Você não tem permissão para acessar o painel administrativo.</p>
-          <button onClick={onClose}>Fechar</button>
+          <h2>{translations.accessDenied}</h2>
+          <p>{translations.noPermissionAdminPanel}</p>
+          <button onClick={onClose}>{translations.close}</button>
         </div>
       </div>
     );
@@ -365,7 +372,7 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({ onClose, initialTab }) =
     return (
       <div className="admin-panel">
         <div className="admin-panel-content">
-          <h2>Carregando...</h2>
+          <h2>{translations.loading}</h2>
         </div>
       </div>
     );
@@ -375,7 +382,7 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({ onClose, initialTab }) =
     <div className="admin-panel">
       <div className="admin-panel-content">
         <div className="admin-panel-header">
-          <h2>Painel Administrativo</h2>
+          <h2>{translations.adminPanel}</h2>
           <button onClick={onClose} className="close-button">
             ×
           </button>
@@ -387,7 +394,7 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({ onClose, initialTab }) =
             onClick={() => setActiveTab("users")}
             data-tab="users"
           >
-            Usuários ({users.length})
+            {translations.users} ({users.length})
           </button>
           <button
             className={`tab-button ${activeTab === "companies" ? "active" : ""
@@ -395,7 +402,7 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({ onClose, initialTab }) =
             onClick={() => setActiveTab("companies")}
             data-tab="companies"
           >
-            Empresas ({companies.length})
+            {translations.companies} ({companies.length})
           </button>
           <button
             className={`tab-button ${activeTab === "shipments" ? "active" : ""
@@ -403,7 +410,7 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({ onClose, initialTab }) =
             onClick={() => setActiveTab("shipments")}
             data-tab="shipments"
           >
-            Shipments ({shipments.length})
+            {translations.shipments} ({shipments.length})
           </button>
         </div>
 
@@ -417,7 +424,7 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({ onClose, initialTab }) =
                 marginBottom: "1rem",
               }}
             >
-              <h3 style={{ margin: 0 }}>Gerenciar Usuários</h3>
+              <h3 style={{ margin: 0 }}>{translations.manageUsers}</h3>
               <button
                 onClick={() => setShowCreateUserModal(true)}
                 style={{
@@ -431,19 +438,19 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({ onClose, initialTab }) =
                 }}
               >
                 <UserPlus size={16} />
-                Criar Usuário
+                {translations.createUser}
               </button>
             </div>
             <div className="admin-table">
               <table>
                 <thead>
                   <tr>
-                    <th>Nome</th>
-                    <th>Email</th>
-                    <th>Role</th>
-                    <th>Empresa</th>
-                    <th>Status</th>
-                    <th>Ações</th>
+                    <th>{translations.name}</th>
+                    <th>{translations.email}</th>
+                    <th>{translations.role}</th>
+                    <th>{translations.company}</th>
+                    <th>{translations.status}</th>
+                    <th>{translations.actions}</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -453,7 +460,7 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({ onClose, initialTab }) =
                       <td>{user.email}</td>
                       <td>
                         <span className={`role-badge ${user.role}`}>
-                          {user.role === UserRole.ADMIN ? "Admin" : "Empresa"}
+                          {user.role === UserRole.ADMIN ? translations.admin : translations.companyLabel}
                         </span>
                       </td>
                       <td>{user.companyName || "-"}</td>
@@ -462,7 +469,7 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({ onClose, initialTab }) =
                           className={`status-badge ${user.isActive ? "active" : "inactive"
                             }`}
                         >
-                          {user.isActive ? "Ativo" : "Inativo"}
+                          {user.isActive ? translations.active : translations.inactive}
                         </span>
                       </td>
                       <td>
@@ -472,13 +479,13 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({ onClose, initialTab }) =
                               toggleUserStatus(user.uid, user.isActive)
                             }
                           >
-                            {user.isActive ? "Desativar" : "Ativar"}
+                            {user.isActive ? translations.deactivate : translations.activate}
                           </button>
                           <button
                             onClick={() => deleteUser(user.uid)}
                             className="delete"
                           >
-                            Excluir
+                            {translations.delete}
                           </button>
                         </div>
                       </td>
@@ -492,16 +499,16 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({ onClose, initialTab }) =
 
         {activeTab === "companies" && (
           <div className="admin-section">
-            <h3>Gerenciar Empresas</h3>
+            <h3>{translations.manageCompanies}</h3>
             <div className="admin-table">
               <table>
                 <thead>
                   <tr>
-                    <th>Nome</th>
-                    <th>Código</th>
-                    <th>Email de Contato</th>
-                    <th>Status</th>
-                    <th>Ações</th>
+                    <th>{translations.name}</th>
+                    <th>{translations.code}</th>
+                    <th>{translations.contactEmail}</th>
+                    <th>{translations.status}</th>
+                    <th>{translations.actions}</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -515,7 +522,7 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({ onClose, initialTab }) =
                           className={`status-badge ${company.isActive ? "active" : "inactive"
                             }`}
                         >
-                          {company.isActive ? "Ativa" : "Inativa"}
+                          {company.isActive ? translations.active : translations.inactive}
                         </span>
                       </td>
                       <td>
@@ -524,7 +531,7 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({ onClose, initialTab }) =
                             toggleCompanyStatus(company.id, company.isActive)
                           }
                         >
-                          {company.isActive ? "Desativar" : "Ativar"}
+                          {company.isActive ? translations.deactivate : translations.activate}
                         </button>
                       </td>
                     </tr>
@@ -537,23 +544,22 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({ onClose, initialTab }) =
 
         {activeTab === "shipments" && (
           <div className="admin-section">
-            <h3>Gerenciar Shipments</h3>
+            <h3>{translations.manageShipments}</h3>
             <div className="admin-note">
               <p>
-                <strong>Nota:</strong> Apenas administradores podem criar
-                shipments. Use esta aba para atribuir shipments às empresas.
+                <strong>{translations.info}:</strong> {translations.adminNote}
               </p>
             </div>
             <div className="admin-table">
               <table>
                 <thead>
                   <tr>
-                    <th>BL</th>
-                    <th>Cliente</th>
-                    <th>POL → POD</th>
-                    <th>Status</th>
-                    <th>Empresa Atual</th>
-                    <th>Atribuir à Empresa</th>
+                    <th>{translations.bl}</th>
+                    <th>{translations.client}</th>
+                    <th>{translations.polToPod}</th>
+                    <th>{translations.status}</th>
+                    <th>{translations.currentCompany}</th>
+                    <th>{translations.assignToCompany}</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -577,7 +583,7 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({ onClose, initialTab }) =
                           }
                           className="company-selector"
                         >
-                          <option value="unassigned">Não atribuído</option>
+                          <option value="unassigned">{translations.notAssigned}</option>
                           {companies
                             .filter((c) => c.isActive)
                             .map((company) => (
@@ -599,7 +605,7 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({ onClose, initialTab }) =
           <div className="admin-panel" style={{ zIndex: 1100 }}>
             <div className="admin-panel-content" style={{ maxWidth: "600px" }}>
               <div className="admin-panel-header">
-                <h2>Criar Novo Usuário</h2>
+                <h2>{translations.createNewUser}</h2>
                 <button
                   onClick={handleCancelCreateUser}
                   className="close-button"
@@ -618,7 +624,7 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({ onClose, initialTab }) =
                       fontWeight: "bold",
                     }}
                   >
-                    Tipo de Usuário
+                    {translations.userType}
                   </label>
                   <div style={{ display: "flex", gap: "1rem" }}>
                     <label
@@ -652,7 +658,7 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({ onClose, initialTab }) =
                         }
                         style={{ margin: 0 }}
                       />
-                      Usuário de Empresa
+                      {translations.companyUser}
                     </label>
                     <label
                       style={{
@@ -685,7 +691,7 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({ onClose, initialTab }) =
                         }
                         style={{ margin: 0 }}
                       />
-                      Administrador
+                      {translations.administrator}
                     </label>
                   </div>
                 </div>
@@ -707,7 +713,7 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({ onClose, initialTab }) =
                         fontWeight: "bold",
                       }}
                     >
-                      Nome Completo *
+                      {translations.fullName} *
                     </label>
                     <input
                       type="text"
@@ -715,7 +721,7 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({ onClose, initialTab }) =
                       onChange={(e) =>
                         setNewUserData({ ...newUserData, name: e.target.value })
                       }
-                      placeholder="Digite o nome completo"
+                      placeholder={translations.fullNamePlaceholder}
                       style={{
                         width: "100%",
                         padding: "0.75rem",
@@ -746,7 +752,7 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({ onClose, initialTab }) =
                         fontWeight: "bold",
                       }}
                     >
-                      Email *
+                      {translations.email} *
                     </label>
                     <input
                       type="email"
@@ -757,7 +763,7 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({ onClose, initialTab }) =
                           email: e.target.value,
                         })
                       }
-                      placeholder="usuario@email.com"
+                      placeholder={translations.emailPlaceholder}
                       style={{
                         width: "100%",
                         padding: "0.75rem",
@@ -799,7 +805,7 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({ onClose, initialTab }) =
                           fontWeight: "bold",
                         }}
                       >
-                        Nome da Empresa *
+                        {translations.companyName} *
                       </label>
                       <input
                         type="text"
@@ -810,7 +816,7 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({ onClose, initialTab }) =
                             companyName: e.target.value,
                           })
                         }
-                        placeholder="Digite o nome da empresa"
+                        placeholder={translations.companyNamePlaceholder}
                         style={{
                           width: "100%",
                           padding: "0.75rem",
@@ -841,7 +847,7 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({ onClose, initialTab }) =
                           fontWeight: "bold",
                         }}
                       >
-                        Código da Empresa *
+                        {translations.companyCode} *
                       </label>
                       <input
                         type="text"
@@ -852,7 +858,7 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({ onClose, initialTab }) =
                             companyCode: e.target.value.toUpperCase(),
                           })
                         }
-                        placeholder="Ex: LOG001"
+                        placeholder={translations.companyCodePlaceholder}
                         style={{
                           width: "100%",
                           padding: "0.75rem",
@@ -874,7 +880,7 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({ onClose, initialTab }) =
                         </p>
                       )}
                       <small style={{ color: "#6c757d", fontSize: "0.8rem" }}>
-                        Código único para identificar a empresa
+                        {translations.companyCodeHint}
                       </small>
                     </div>
                   </div>
@@ -897,7 +903,7 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({ onClose, initialTab }) =
                         fontWeight: "bold",
                       }}
                     >
-                      Senha *
+                      {translations.password} *
                     </label>
                     <input
                       type="password"
@@ -908,7 +914,7 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({ onClose, initialTab }) =
                           password: e.target.value,
                         })
                       }
-                      placeholder="Mínimo 6 caracteres"
+                      placeholder={translations.passwordPlaceholder}
                       style={{
                         width: "100%",
                         padding: "0.75rem",
@@ -939,7 +945,7 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({ onClose, initialTab }) =
                         fontWeight: "bold",
                       }}
                     >
-                      Confirmar Senha *
+                      {translations.confirmPassword} *
                     </label>
                     <input
                       type="password"
@@ -950,7 +956,7 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({ onClose, initialTab }) =
                           confirmPassword: e.target.value,
                         })
                       }
-                      placeholder="Confirme a senha"
+                      placeholder={translations.confirmPasswordPlaceholder}
                       style={{
                         width: "100%",
                         padding: "0.75rem",
@@ -989,14 +995,14 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({ onClose, initialTab }) =
                     style={{ backgroundColor: "#6c757d", color: "white" }}
                     disabled={isCreatingUser}
                   >
-                    Cancelar
+                    {translations.cancel}
                   </button>
                   <button
                     onClick={handleCreateUser}
                     style={{ backgroundColor: "#789170", color: "white" }}
                     disabled={isCreatingUser}
                   >
-                    {isCreatingUser ? "Criando..." : "Criar Usuário"}
+                    {isCreatingUser ? translations.creating : translations.createUser}
                   </button>
                 </div>
               </div>
