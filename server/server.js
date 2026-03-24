@@ -1,10 +1,12 @@
+const path = require("path");
 const express = require("express");
 const nodemailer = require("nodemailer");
 const cors = require("cors");
 const dotenv = require("dotenv");
+const twilio = require("twilio");
 
-// Configurar dotenv - carrega o .env da pasta pai
-dotenv.config({ path: "../.env" });
+// Configurar dotenv - .env na raiz do projeto (pasta pai de server/)
+dotenv.config({ path: path.join(__dirname, "..", ".env") });
 
 // Criar app Express
 const app = express();
@@ -326,7 +328,46 @@ app.get(
 );
 
 // ==========================================
-// ROTAS WHATSAPP BUSINESS API
+// CONFIGURAÇÃO WHATSAPP (META CLOUD API / TWILIO)
+// ==========================================
+
+// Detecta se o Twilio está configurado
+const hasTwilioConfig = !!(
+  process.env.TWILIO_ACCOUNT_SID &&
+  process.env.TWILIO_AUTH_TOKEN &&
+  process.env.TWILIO_WHATSAPP_FROM
+);
+
+let twilioClient = null;
+if (hasTwilioConfig) {
+  twilioClient = twilio(
+    process.env.TWILIO_ACCOUNT_SID,
+    process.env.TWILIO_AUTH_TOKEN
+  );
+  console.log("Twilio WhatsApp configurado (modo envio).");
+}
+
+// Helper para normalizar número para formato Twilio (whatsapp:+5511999999999)
+const formatWhatsAppNumberForTwilio = (phone) => {
+  if (!phone) return phone;
+
+  let cleaned = String(phone).trim();
+
+  // Se já vier com prefixo whatsapp:, mantém
+  if (cleaned.startsWith("whatsapp:")) {
+    return cleaned;
+  }
+
+  // Garante o +
+  if (!cleaned.startsWith("+")) {
+    cleaned = `+${cleaned}`;
+  }
+
+  return `whatsapp:${cleaned}`;
+};
+
+// ==========================================
+// ROTAS WHATSAPP
 // ==========================================
 
 // Rota para enviar mensagem WhatsApp
@@ -345,13 +386,58 @@ app.post("/api/whatsapp/send-message", async (req, res) => {
     console.log("Enviando para:", to);
     console.log("Mensagem:", message.substring(0, 100) + "...");
 
+    // ==========================================
+    // MODO TWILIO (PREFERENCIAL SE CONFIGURADO)
+    // ==========================================
+    if (hasTwilioConfig && twilioClient) {
+      try {
+        const fromNumber = formatWhatsAppNumberForTwilio(
+          process.env.TWILIO_WHATSAPP_FROM
+        );
+        const toNumber = formatWhatsAppNumberForTwilio(to);
+
+        console.log("Usando Twilio WhatsApp para envio.");
+        console.log("From:", fromNumber);
+        console.log("To:", toNumber);
+
+        const twilioMessage = await twilioClient.messages.create({
+          from: fromNumber,
+          to: toNumber,
+          body: message,
+        });
+
+        console.log("=== MENSAGEM WHATSAPP (TWILIO) ENVIADA COM SUCESSO ===");
+        console.log("SID:", twilioMessage.sid);
+
+        return res.json({
+          success: true,
+          messageId: twilioMessage.sid,
+          provider: "twilio",
+        });
+      } catch (twilioError) {
+        console.error("Erro ao enviar mensagem via Twilio:", twilioError);
+        return res.status(500).json({
+          success: false,
+          error:
+            twilioError.message ||
+            "Erro ao enviar mensagem via Twilio WhatsApp",
+        });
+      }
+    }
+
+    // ==========================================
+    // FALLBACK: META WHATSAPP CLOUD API
+    // (mantém compatibilidade futura quando Meta estiver aprovada)
+    // ==========================================
+
     const phoneNumberId = process.env.WHATSAPP_PHONE_NUMBER_ID;
     const accessToken = process.env.WHATSAPP_ACCESS_TOKEN;
 
     if (!phoneNumberId || !accessToken) {
       return res.status(500).json({
         success: false,
-        error: "Credenciais do WhatsApp não configuradas no servidor",
+        error:
+          "Nenhuma integração de WhatsApp configurada (Twilio ou Meta). Verifique as variáveis de ambiente.",
       });
     }
 
@@ -402,7 +488,7 @@ app.post("/api/whatsapp/send-message", async (req, res) => {
     const responseData = await response.json();
 
     if (!response.ok) {
-      console.error("Erro da WhatsApp API:", responseData);
+      console.error("Erro da WhatsApp API (Meta):", responseData);
       return res.status(response.status).json({
         success: false,
         error: responseData.error?.message || "Erro ao enviar mensagem",
@@ -410,12 +496,13 @@ app.post("/api/whatsapp/send-message", async (req, res) => {
       });
     }
 
-    console.log("=== MENSAGEM WHATSAPP ENVIADA COM SUCESSO ===");
+    console.log("=== MENSAGEM WHATSAPP (META) ENVIADA COM SUCESSO ===");
     console.log("Message ID:", responseData.messages?.[0]?.id);
 
     res.json({
       success: true,
       messageId: responseData.messages?.[0]?.id,
+      provider: "meta",
       response: responseData,
     });
   } catch (error) {
@@ -514,6 +601,40 @@ app.get("/api/whatsapp/message-status/:messageId", async (req, res) => {
     console.log("=== VERIFICANDO STATUS DE MENSAGEM ===");
     console.log("Message ID:", messageId);
 
+    // Se Twilio estiver configurado, tenta via Twilio
+    if (hasTwilioConfig && twilioClient) {
+      try {
+        const twilioMessage = await twilioClient.messages(messageId).fetch();
+
+        return res.json({
+          success: true,
+          provider: "twilio",
+          status: {
+            sid: twilioMessage.sid,
+            status: twilioMessage.status,
+            to: twilioMessage.to,
+            from: twilioMessage.from,
+            dateCreated: twilioMessage.dateCreated,
+            dateUpdated: twilioMessage.dateUpdated,
+            errorCode: twilioMessage.errorCode,
+            errorMessage: twilioMessage.errorMessage,
+          },
+        });
+      } catch (twilioError) {
+        console.error(
+          "Erro ao verificar status via Twilio:",
+          twilioError.message || twilioError
+        );
+        return res.status(500).json({
+          success: false,
+          error:
+            twilioError.message ||
+            "Erro ao verificar status da mensagem via Twilio",
+        });
+      }
+    }
+
+    // Fallback para Meta
     const accessToken = process.env.WHATSAPP_ACCESS_TOKEN;
     const apiVersion = process.env.WHATSAPP_API_VERSION || "v21.0";
 
@@ -536,6 +657,7 @@ app.get("/api/whatsapp/message-status/:messageId", async (req, res) => {
 
     res.json({
       success: true,
+      provider: "meta",
       status: data,
     });
   } catch (error) {
@@ -550,17 +672,27 @@ app.get("/api/whatsapp/message-status/:messageId", async (req, res) => {
 
 // Rota para verificar configuração do WhatsApp
 app.get("/api/whatsapp/verify", (req, res) => {
-  const hasConfig = !!(
+  const hasMetaConfig = !!(
     process.env.WHATSAPP_PHONE_NUMBER_ID && process.env.WHATSAPP_ACCESS_TOKEN
   );
 
+  const hasTwilio = hasTwilioConfig;
+
+  const success = hasMetaConfig || hasTwilio;
+
   res.json({
-    success: hasConfig,
-    configured: hasConfig,
-    phoneNumberId: process.env.WHATSAPP_PHONE_NUMBER_ID
+    success,
+    configured: success,
+    provider: hasTwilio ? "twilio" : hasMetaConfig ? "meta" : null,
+    phoneNumberMaskedMeta: hasMetaConfig
       ? "***" + process.env.WHATSAPP_PHONE_NUMBER_ID.slice(-4)
       : null,
-    message: hasConfig ? "WhatsApp configurado" : "WhatsApp não configurado",
+    fromTwilio: hasTwilio ? process.env.TWILIO_WHATSAPP_FROM : null,
+    message: success
+      ? hasTwilio
+        ? "WhatsApp configurado via Twilio"
+        : "WhatsApp configurado via Meta Cloud API"
+      : "WhatsApp não configurado (nem Twilio nem Meta)",
   });
 });
 

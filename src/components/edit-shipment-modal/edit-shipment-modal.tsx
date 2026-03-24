@@ -10,7 +10,6 @@ import { useLanguage } from "../../context/language-context";
 import type { Shipment } from "../../context/shipments-context";
 import { db } from "../../lib/firebaseConfig";
 import { Cliente } from "../../types/customer";
-import StatusSelector from "../shipping-table/status-selector";
 import "./edit-shipment-modal.css";
 
 interface EditShipmentModalProps {
@@ -41,6 +40,21 @@ interface FormData {
   actualDeparture: string;
   reportedEta: string;
 }
+
+const STATUS_OPTIONS = [
+  // Mesmo mapa de cores do StatusSelector / tabela
+  { value: "documentacao", label: "Documentação", color: "#ffffff", bgColor: "#6c757d" },
+  { value: "agendado", label: "Agendado", color: "#ffffff", bgColor: "#17a2b8" },
+  { value: "a-embarcar", label: "A Embarcar", color: "#8b5a00", bgColor: "#ffd166" },
+  { value: "embarcando", label: "Embarcando", color: "#ffffff", bgColor: "#fd7e14" },
+  { value: "em-transito", label: "Em Trânsito", color: "#ffffff", bgColor: "#118ab2" },
+  { value: "desembarcando", label: "Desembarcando", color: "#ffffff", bgColor: "#6f42c1" },
+  { value: "em-entrega", label: "Em Entrega", color: "#ffffff", bgColor: "#20c997" },
+  { value: "concluido", label: "Concluído", color: "#ffffff", bgColor: "#073b4c" },
+  { value: "atrasado", label: "Atrasado", color: "#ffffff", bgColor: "#dc3545" },
+  { value: "cancelado", label: "Cancelado", color: "#ffffff", bgColor: "#6c757d" },
+  { value: "suspenso", label: "Suspenso", color: "#ffffff", bgColor: "#ffc107" },
+];
 
 const EditShipmentModal = ({
   shipment,
@@ -76,6 +90,8 @@ const EditShipmentModal = ({
 
   const [clientes, setClientes] = useState<Cliente[]>([]);
   const [loadingClientes, setLoadingClientes] = useState(false);
+  // ID do cliente selecionado (option value é cliente.id, não o nome)
+  const [selectedClienteId, setSelectedClienteId] = useState<string>("");
 
   useEffect(() => {
     const fetchClientes = async () => {
@@ -177,10 +193,10 @@ const EditShipmentModal = ({
   const handleClienteChange = (clienteId: string) => {
     const clienteSel = clientes.find((c) => c.id === clienteId);
     if (!clienteSel) return;
-
+    setSelectedClienteId(clienteId);
     setFormData((prev) => ({
       ...prev,
-      cliente: clienteSel.nome,
+      cliente: clienteSel.empresa,
     }));
   };
 
@@ -214,6 +230,14 @@ const EditShipmentModal = ({
     }
   }, [shipment]);
 
+  // Quando clientes carregam, definir o cliente selecionado pelo companyId do shipment
+  useEffect(() => {
+    if (!shipment?.companyId || clientes.length === 0) return;
+    const match = clientes.find((c) => c.companyId === shipment.companyId);
+    if (match) setSelectedClienteId(match.id);
+    else setSelectedClienteId("");
+  }, [shipment?.companyId, clientes]);
+
   const handleInputChange = (
     e: React.ChangeEvent<
       HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement
@@ -234,6 +258,10 @@ const EditShipmentModal = ({
       }));
     }
   };
+
+  const currentStatusOption = STATUS_OPTIONS.find(
+    (status) => status.value === formData.status
+  );
 
   const validateForm = (): boolean => {
     const newErrors: Record<string, string> = {};
@@ -300,6 +328,7 @@ const EditShipmentModal = ({
     setIsLoading(true);
 
     try {
+      const selectedCliente = clientes.find((c) => c.id === selectedClienteId);
       const updatedShipment: Shipment = {
         ...shipment,
         cliente: formData.cliente,
@@ -321,6 +350,7 @@ const EditShipmentModal = ({
         imo: formData.imo,
         actualDeparture: formData.actualDeparture,
         reportedEta: formData.reportedEta,
+        companyId: selectedCliente?.companyId ?? shipment.companyId,
         updatedAt: new Date(),
       };
 
@@ -398,9 +428,9 @@ const EditShipmentModal = ({
                   <select
                     id="clienteId"
                     name="clienteId"
-                    value={formData.cliente}
+                    value={selectedClienteId}
                     onChange={(e) => handleClienteChange(e.target.value)}
-                    disabled={loadingClientes}
+                    disabled={loadingClientes || !canEdit}
                     required
                   >
                     <option value="">
@@ -657,14 +687,29 @@ const EditShipmentModal = ({
 
                 <div className="form-group">
                   <label htmlFor="status">{translations.status}</label>
-                  <StatusSelector
-                    currentStatus={formData.status}
-                    onStatusChange={(newStatus) => {
-                      setFormData((prev) => ({ ...prev, status: newStatus }));
-                    }}
-                    instanceId={`edit-modal-${shipment.id}`}
+                  <select
+                    id="status"
+                    name="status"
+                    value={formData.status}
+                    onChange={handleInputChange}
                     disabled={!canEdit}
-                  />
+                  >
+                    <option value="">
+                      {translations.selectStatus || "Selecione um status"}
+                    </option>
+                    {STATUS_OPTIONS.map((status) => (
+                      <option
+                        key={status.value}
+                        value={status.value}
+                        style={{
+                          backgroundColor: status.bgColor,
+                          color: status.color,
+                        }}
+                      >
+                        {status.label}
+                      </option>
+                    ))}
+                  </select>
                 </div>
               </div>
 

@@ -1,4 +1,4 @@
-import { Shipment } from "../context/shipments-context";
+import type { Shipment } from "../context/shipments-context";
 
 interface WhatsAppMessageOptions {
   to: string;
@@ -134,23 +134,19 @@ export const sendStatusUpdateWhatsApp = async (
 ): Promise<boolean> => {
   const formattedPhone = formatPhoneNumber(clientPhone);
 
+  const clientName = shipment.cliente || "cliente";
+  const statusAtual = shipment.status || "atualizado";
+
   const message = `🔔 *Atualização de Status - Sea Logistics*
 
-Olá! 
+Olá ${clientName},
 
-Seu envio *${shipment.numeroBl}* foi atualizado:
+O novo status do seu envio agora é: *${statusAtual}*.
 
-📦 Status anterior: ${oldStatus}
-✅ Novo status: *${shipment.status}*
+Para mais informações, entre em contato conosco ou acesse nosso sistema.
 
-📋 Informações do envio:
-• Cliente: ${shipment.cliente}
-• Origem: ${shipment.pol}
-• Destino: ${shipment.pod}
-• Booking: ${shipment.booking}
-${additionalInfo ? `\n${additionalInfo}` : ""}
-
-_Acompanhe em tempo real pelo nosso sistema._
+BL: ${shipment.numeroBl || "-"}
+Origem: ${shipment.pol || "-"} → Destino: ${shipment.pod || "-"}
 
 _Sea Logistics International_
 📞 +55 11 95939-1837`;

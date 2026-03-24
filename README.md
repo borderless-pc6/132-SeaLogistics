@@ -158,4 +158,3 @@ Para suporte, abra uma issue no repositório ou entre em contato com a equipe.
 
 ---
 
-**Desenvolvido com ❤️ para logística marítima**

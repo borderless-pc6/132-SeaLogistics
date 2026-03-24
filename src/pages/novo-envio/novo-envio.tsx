@@ -308,6 +308,15 @@ const NovoEnvioPage = () => {
         return;
       }
 
+      // Para o envio aparecer no perfil do cliente, ele precisa ter companyId
+      if (!clienteSelecionado.companyId) {
+        showError(
+          "Este cliente não tem empresa vinculada. O envio não aparecerá no perfil dele. Vincule uma empresa ao usuário nas configurações."
+        );
+        setIsSubmitting(false);
+        return;
+      }
+
       const shipmentData = {
         cliente: clienteSelecionado.empresa,
         operador: formData.operador,
@@ -653,6 +662,31 @@ const NovoEnvioPage = () => {
                 <FileText size={20} />
                 <h2>Documentação</h2>
               </div>
+
+              {formData.tipo === "Marítimo" && (
+                <div className="form-row">
+                  <div className="form-group">
+                    <label htmlFor="armador">Armador *</label>
+                    <select
+                      id="armador"
+                      name="armador"
+                      value={formData.armador}
+                      onChange={handleInputChange}
+                      onBlur={() => handleBlur('armador')}
+                      className={errors.armador ? 'input-error' : ''}
+                      required
+                    >
+                      <option value="">Selecione o armador</option>
+                      {armadores.map((arm) => (
+                        <option key={arm} value={arm}>
+                          {arm}
+                        </option>
+                      ))}
+                    </select>
+                    {errors.armador && <span className="error-text">{errors.armador}</span>}
+                  </div>
+                </div>
+              )}
 
               <div className="form-row">
                 <div className="form-group">

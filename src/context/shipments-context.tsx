@@ -27,6 +27,7 @@ import {
   sendEmail,
   sendMaritimeShipmentUpdateEmail,
 } from "../services/emailService";
+import { sendStatusUpdateNotification } from "../services/notificationService";
 import { UserRole } from "../types/user";
 import { useAuth } from "./auth-context";
 
@@ -321,8 +322,8 @@ export const ShipmentsProvider: React.FC<ShipmentsProviderProps> = ({
       console.log("Status atual:", oldStatus);
       console.log("Novo status:", updatedShipment.status);
 
-      // Atualizar todos os campos do shipment
-      await updateDoc(shipmentRef, {
+      // Atualizar todos os campos do shipment (incluindo companyId se o cliente for alterado)
+      const updatePayload: Record<string, unknown> = {
         cliente: updatedShipment.cliente,
         operador: updatedShipment.operador,
         shipper: updatedShipment.shipper,
@@ -337,64 +338,95 @@ export const ShipmentsProvider: React.FC<ShipmentsProviderProps> = ({
         armador: updatedShipment.armador,
         booking: updatedShipment.booking,
         invoice: updatedShipment.invoice,
-        observacoes: updatedShipment.observacoes || "", // Incluir observações
-        tipo: updatedShipment.tipo || "", // Incluir tipo de transporte
-        imo: updatedShipment.imo || "", // Incluir IMO do navio
-        actualDeparture: updatedShipment.actualDeparture || "", // Incluir horário real de partida
-        reportedEta: updatedShipment.reportedEta || "", // Incluir ETA reportado
+        observacoes: updatedShipment.observacoes || "",
+        tipo: updatedShipment.tipo || "",
+        imo: updatedShipment.imo || "",
+        actualDeparture: updatedShipment.actualDeparture || "",
+        reportedEta: updatedShipment.reportedEta || "",
         updatedAt: new Date(),
-      });
+      };
+      if (updatedShipment.companyId !== undefined) {
+        updatePayload.companyId = updatedShipment.companyId;
+      }
+      await updateDoc(shipmentRef, updatePayload);
 
-      // Enviar email de notificação se o status mudou
-      if (oldStatus !== updatedShipment.status && updatedShipment.companyId) {
-        try {
-          console.log("Status alterado, buscando dados da empresa...");
-          console.log("Company ID para busca:", updatedShipment.companyId);
+      // Enviar notificações se o status mudou
+      if (oldStatus !== updatedShipment.status) {
+        // 1) Notificação por email para a empresa (mantém comportamento atual)
+        if (updatedShipment.companyId) {
+          try {
+            console.log("Status alterado, buscando dados da empresa...");
+            console.log("Company ID para busca:", updatedShipment.companyId);
 
-          const companyDoc = await getDoc(
-            doc(db, "companies", updatedShipment.companyId)
-          );
-          console.log("Documento da empresa encontrado:", companyDoc.exists());
+            const companyDoc = await getDoc(
+              doc(db, "companies", updatedShipment.companyId)
+            );
+            console.log("Documento da empresa encontrado:", companyDoc.exists());
 
-          if (companyDoc.exists()) {
-            const companyData = companyDoc.data();
-            console.log("Dados da empresa:", companyData);
+            if (companyDoc.exists()) {
+              const companyData = companyDoc.data();
+              console.log("Dados da empresa:", companyData);
 
-            if (companyData.contactEmail) {
-              console.log(
-                "Preparando para enviar email para:",
-                companyData.contactEmail
-              );
-              // Usar o novo template de email para embarques marítimos
-              if (updatedShipment.tipo === "Marítimo") {
-                await sendMaritimeShipmentUpdateEmail(
-                  companyData.contactEmail,
-                  companyData.name || "Cliente",
-                  {
-                    vessel: updatedShipment.armador,
-                    originPort: updatedShipment.pol,
-                    destinationPort: updatedShipment.pod,
-                    booking: updatedShipment.booking,
-                    blNumber: updatedShipment.numeroBl,
-                    etd: updatedShipment.etdOrigem,
-                    eta: updatedShipment.etaDestino,
-                    currentLocation: updatedShipment.currentLocation,
-                    status: updatedShipment.status,
-                    imo: updatedShipment.imo || "9735206",
-                    actualDeparture:
-                      updatedShipment.actualDeparture ||
-                      `${updatedShipment.etdOrigem} 21:19 (UTC-5)`,
-                    reportedEta:
-                      updatedShipment.reportedEta ||
-                      `${updatedShipment.etaDestino} 12:00 (UTC-3)`,
+              // Destinatário: contactEmail da empresa ou, se vazio, email do primeiro usuário da empresa
+              let emailTo = (companyData.contactEmail || "").trim();
+              if (!emailTo) {
+                try {
+                  const usersSnap = await getDocs(
+                    query(
+                      collection(db, "users"),
+                      where("companyId", "==", updatedShipment.companyId)
+                    )
+                  );
+                  const firstUser = usersSnap.docs.find(
+                    (d) => d.data().email
+                  );
+                  if (firstUser?.data()?.email) {
+                    emailTo = firstUser.data().email.trim();
+                    console.log(
+                      "Empresa sem contactEmail; usando email do usuário:",
+                      emailTo
+                    );
                   }
+                } catch (e) {
+                  console.warn("Erro ao buscar usuário da empresa:", e);
+                }
+              }
+
+              if (emailTo) {
+                console.log(
+                  "Preparando para enviar email de atualização de status para:",
+                  emailTo
                 );
-              } else {
-                // Email padrão para outros tipos de transporte
-                await sendEmail({
-                  to: companyData.contactEmail,
-                  subject: `Status do envio atualizado - ${updatedShipment.numeroBl}`,
-                  html: `
+                // Usar o novo template de email para embarques marítimos
+                if (updatedShipment.tipo === "Marítimo") {
+                  await sendMaritimeShipmentUpdateEmail(
+                    emailTo,
+                    companyData.name || "Cliente",
+                    {
+                      vessel: updatedShipment.armador,
+                      originPort: updatedShipment.pol,
+                      destinationPort: updatedShipment.pod,
+                      booking: updatedShipment.booking,
+                      blNumber: updatedShipment.numeroBl,
+                      etd: updatedShipment.etdOrigem,
+                      eta: updatedShipment.etaDestino,
+                      currentLocation: updatedShipment.currentLocation,
+                      status: updatedShipment.status,
+                      imo: updatedShipment.imo || "9735206",
+                      actualDeparture:
+                        updatedShipment.actualDeparture ||
+                        `${updatedShipment.etdOrigem} 21:19 (UTC-5)`,
+                      reportedEta:
+                        updatedShipment.reportedEta ||
+                        `${updatedShipment.etaDestino} 12:00 (UTC-3)`,
+                    }
+                  );
+                } else {
+                  // Email padrão para outros tipos de transporte
+                  await sendEmail({
+                    to: emailTo,
+                    subject: `Status do envio atualizado - ${updatedShipment.numeroBl}`,
+                    html: `
                                     <h2>Status do envio atualizado</h2>
                                     <p>O status do seu envio foi atualizado:</p>
                                     <ul>
@@ -426,20 +458,41 @@ export const ShipmentsProvider: React.FC<ShipmentsProviderProps> = ({
                                         }</li>
                                     </ul>
                                 `,
-                });
+                  });
+                }
+              } else {
+                console.log(
+                  "Nenhum email para notificação: empresa sem contactEmail e sem usuário com email para companyId:",
+                  updatedShipment.companyId
+                );
               }
             } else {
-              console.log("Empresa não tem email de contato cadastrado");
+              console.log("Empresa não encontrada no Firestore");
             }
-          } else {
-            console.log("Empresa não encontrada no Firestore");
+          } catch (error) {
+            console.error("=== ERRO AO ENVIAR EMAIL DE NOTIFICAÇÃO ===");
+            console.error("Detalhes do erro:", error);
           }
-        } catch (error) {
-          console.error("=== ERRO AO ENVIAR EMAIL DE NOTIFICAÇÃO ===");
-          console.error("Detalhes do erro:", error);
+        }
+
+        // 2) Notificação automática (email/WhatsApp) para o usuário/cliente, respeitando preferências
+        if (currentUser) {
+          try {
+            await sendStatusUpdateNotification(
+              updatedShipment,
+              currentUser.uid,
+              oldStatus,
+              currentUser.email || undefined
+            );
+          } catch (error) {
+            console.error(
+              "=== ERRO AO ENVIAR NOTIFICAÇÃO DE STATUS (USUÁRIO) ==="
+            );
+            console.error("Detalhes do erro:", error);
+          }
         }
       } else {
-        console.log("Status não foi alterado ou shipment não tem companyId");
+        console.log("Status não foi alterado");
         console.log(
           "oldStatus === updatedShipment.status:",
           oldStatus === updatedShipment.status

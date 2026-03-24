@@ -131,6 +131,29 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({ onClose, initialTab }) =
     }
   };
 
+  const assignUserToCompany = async (userId: string, companyId: string) => {
+    if (!companyId) return;
+    const company = companies.find((c) => c.id === companyId);
+    if (!company) return;
+    try {
+      await updateDoc(doc(db, "users", userId), {
+        companyId,
+        companyName: company.name,
+        updatedAt: new Date(),
+      });
+      setUsers(
+        users.map((user) =>
+          user.uid === userId
+            ? { ...user, companyId, companyName: company.name }
+            : user
+        )
+      );
+    } catch (error) {
+      console.error("Error assigning user to company:", error);
+      alert("Erro ao vincular usuário à empresa.");
+    }
+  };
+
   const toggleCompanyStatus = async (
     companyId: string,
     currentStatus: boolean
@@ -463,7 +486,26 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({ onClose, initialTab }) =
                           {user.role === UserRole.ADMIN ? translations.admin : translations.companyLabel}
                         </span>
                       </td>
-                      <td>{user.companyName || "-"}</td>
+                      <td>
+                        {user.role === UserRole.ADMIN ? (
+                          "-"
+                        ) : (
+                          <select
+                            value={user.companyId || ""}
+                            onChange={(e) =>
+                              assignUserToCompany(user.uid, e.target.value)
+                            }
+                            title="Vincular este usuário a uma empresa para que os envios apareçam no perfil dele"
+                          >
+                            <option value="">Selecione a empresa</option>
+                            {companies.map((company) => (
+                              <option key={company.id} value={company.id}>
+                                {company.name}
+                              </option>
+                            ))}
+                          </select>
+                        )}
+                      </td>
                       <td>
                         <span
                           className={`status-badge ${user.isActive ? "active" : "inactive"

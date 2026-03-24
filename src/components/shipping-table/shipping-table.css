@@ -337,33 +337,69 @@
   white-space: nowrap;
 }
 
+/* Cores de status alinhadas com o seletor do modal */
 .status-documentacao,
 .status-pendente {
-  background-color: #ffc107;
-  color: #212529;
+  background-color: #6c757d;
+  color: #ffffff;
+}
+
+.status-agendado {
+  background-color: #17a2b8;
+  color: #ffffff;
+}
+
+.status-a-embarcar {
+  background-color: #ffd166;
+  color: #8b5a00;
+}
+
+.status-embarcando {
+  background-color: #fd7e14;
+  color: #ffffff;
 }
 
 .status-em-transito,
 .status-em-trânsito {
-  background-color: #17a2b8;
-  color: white;
+  background-color: #118ab2;
+  color: #ffffff;
+}
+
+.status-desembarcando {
+  background-color: #6f42c1;
+  color: #ffffff;
+}
+
+.status-em-entrega {
+  background-color: #20c997;
+  color: #ffffff;
 }
 
 .status-concluido,
 .status-entregue {
-  background-color: #28a745;
-  color: white;
+  background-color: #073b4c;
+  color: #ffffff;
 }
 
 .status-atrasado,
 .status-delayed {
   background-color: #dc3545;
-  color: white;
+  color: #ffffff;
+}
+
+.status-cancelado {
+  background-color: #6c757d;
+  color: #ffffff;
+}
+
+.status-suspenso {
+  background-color: #ffc107;
+  color: #212529;
 }
 
 .status-unknown {
   background-color: #6c757d;
-  color: white;
+  color: #ffffff;
 }
 
 .observations-cell {

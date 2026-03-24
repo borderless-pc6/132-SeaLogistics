@@ -1,5 +1,5 @@
 import { doc, getDoc } from 'firebase/firestore';
-import { Shipment } from '../context/shipments-context';
+import type { Shipment } from '../context/shipments-context';
 import { db } from '../lib/firebaseConfig';
 import { sendEmail } from './emailService';
 import { sendShipmentCreatedWhatsApp, sendStatusUpdateWhatsApp } from './whatsappService';
@@ -10,6 +10,16 @@ interface NotificationPreferences {
     statusUpdates: boolean;
     newShipments: boolean;
 }
+
+// Número de WhatsApp de teste para disparos automáticos (ex.: seu próprio número no sandbox)
+// Ex: VITE_WHATSAPP_TEST_PHONE=555191341262 (sem comentário na mesma linha no .env)
+const rawTestPhone = import.meta.env.VITE_WHATSAPP_TEST_PHONE;
+const TEST_WHATSAPP_PHONE = (() => {
+  if (typeof rawTestPhone !== "string" || !rawTestPhone.trim()) return undefined;
+  const digits = rawTestPhone.replace(/\D/g, "");
+  if (digits.length < 10) return undefined;
+  return digits.startsWith("55") ? digits : `55${digits}`;
+})();
 
 /**
  * Busca as preferências de notificação do usuário
@@ -104,14 +114,22 @@ export const sendShipmentNotification = async (
         results.email = await sendShipmentCreatedEmail(shipment, clientEmail);
     }
 
-    // Enviar WhatsApp (se habilitado e número fornecido)
-    if (preferences.whatsapp) {
-        const whatsappNumber = clientPhone || await getUserWhatsAppNumber(userId);
+    // Enviar WhatsApp (se habilitado e número fornecido ou se houver número de teste configurado)
+    if (preferences.whatsapp || TEST_WHATSAPP_PHONE) {
+        const whatsappNumber =
+            clientPhone ||
+            (await getUserWhatsAppNumber(userId)) ||
+            TEST_WHATSAPP_PHONE;
         
         if (whatsappNumber) {
-            results.whatsapp = await sendShipmentCreatedWhatsApp(shipment, whatsappNumber);
+            results.whatsapp = await sendShipmentCreatedWhatsApp(
+                shipment,
+                whatsappNumber
+            );
         } else {
-            console.log('WhatsApp habilitado mas número não configurado');
+            console.log(
+                'WhatsApp habilitado ou número de teste definido, mas nenhum número foi encontrado'
+            );
         }
     }
 
@@ -148,14 +166,23 @@ export const sendStatusUpdateNotification = async (
         results.email = await sendStatusUpdateEmail(shipment, clientEmail, oldStatus);
     }
 
-    // Enviar WhatsApp (se habilitado e número fornecido)
-    if (preferences.whatsapp) {
-        const whatsappNumber = clientPhone || await getUserWhatsAppNumber(userId);
-        
-        if (whatsappNumber) {
-            results.whatsapp = await sendStatusUpdateWhatsApp(shipment, whatsappNumber, oldStatus);
+    // Enviar WhatsApp (se habilitado e número fornecido ou se houver número de teste configurado)
+    if (preferences.whatsapp || TEST_WHATSAPP_PHONE) {
+        const userPhone = await getUserWhatsAppNumber(userId);
+        const whatsappNumber =
+            clientPhone || userPhone || TEST_WHATSAPP_PHONE;
+
+        if (!whatsappNumber) {
+            console.warn(
+                "[WhatsApp] Nenhum número para envio: defina VITE_WHATSAPP_TEST_PHONE no .env e reinicie o frontend (npm run dev)."
+            );
         } else {
-            console.log('WhatsApp habilitado mas número não configurado');
+            console.log("[WhatsApp] Enviando atualização de status para:", whatsappNumber.replace(/(\d{4})\d+(\d{2})/, "$1****$2"));
+            results.whatsapp = await sendStatusUpdateWhatsApp(
+                shipment,
+                whatsappNumber,
+                oldStatus
+            );
         }
     }
 
