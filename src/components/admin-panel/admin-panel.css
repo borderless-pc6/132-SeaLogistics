@@ -150,6 +150,11 @@
   color: #7b1fa2;
 }
 
+.role-badge.operator {
+  background: #fff3e0;
+  color: #e65100;
+}
+
 .status-badge.active {
   background: #e8f5e9;
   color: #388e3c;

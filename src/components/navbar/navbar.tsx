@@ -15,7 +15,7 @@ const Navbar = () => {
   const [showAdminPanel, setShowAdminPanel] = useState(false);
   const navigate = useNavigate();
   const location = useLocation();
-  const { isAdmin, logout } = useAuth();
+  const { isAdmin, isStaff, logout } = useAuth();
   const { translations } = useLanguage();
 
   const getActiveItem = () => {
@@ -66,7 +66,7 @@ const Navbar = () => {
               <Home size={20} />
             </div>
             <span className={`nav-text ${!isCollapsed ? "visible" : "hidden"}`}>
-              {isAdmin() ? translations.dashboard : translations.inicio}
+              {isStaff() ? translations.dashboard : translations.inicio}
             </span>
           </div>
 
@@ -86,7 +86,7 @@ const Navbar = () => {
           </div>
 
           {/* Botão Novo Envio - apenas para admins */}
-          {isAdmin() && (
+          {isStaff() && (
             <div
               className={`nav-item ${activeItem === "novo-envio" ? "active" : ""
                 }`}

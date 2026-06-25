@@ -28,6 +28,7 @@ import {
   sendMaritimeShipmentUpdateEmail,
 } from "../services/emailService";
 import { sendStatusUpdateNotification } from "../services/notificationService";
+import { recordStatusHistory } from "../services/statusHistoryService";
 import { UserRole } from "../types/user";
 import { useAuth } from "./auth-context";
 
@@ -101,8 +102,7 @@ export const ShipmentsProvider: React.FC<ShipmentsProviderProps> = ({
 
     let q;
 
-    if (isAdmin()) {
-      // Admin vê todos os shipments
+    if (isAdmin() || currentUser.role === UserRole.OPERATOR) {
       q = query(collection(db, "shipments"), orderBy("createdAt", "desc"));
     } else if (
       currentUser.role === UserRole.COMPANY_USER &&
@@ -157,9 +157,10 @@ export const ShipmentsProvider: React.FC<ShipmentsProviderProps> = ({
       }
 
       const isAdmin_ = isAdmin();
+      const isOperator_ = currentUser.role === UserRole.OPERATOR;
       const isCompanyUser_ = currentUser.role === UserRole.COMPANY_USER;
 
-      if (!isAdmin_ && !isCompanyUser_) {
+      if (!isAdmin_ && !isOperator_ && !isCompanyUser_) {
         throw new Error("Você não tem permissão para criar novos shipments");
       }
 
@@ -193,6 +194,20 @@ export const ShipmentsProvider: React.FC<ShipmentsProviderProps> = ({
         shipmentWithCompany
       );
       console.log("Shipment added with ID: ", docRef.id);
+
+      try {
+        await recordStatusHistory({
+          shipmentId: docRef.id,
+          eventType: "created",
+          toStatus: shipmentData.status || "documentacao",
+          changedBy: currentUser.uid,
+          changedByName:
+            currentUser.displayName || currentUser.email || "Sistema",
+          companyId: companyIdToUse,
+        });
+      } catch (historyError) {
+        console.error("Erro ao registrar histórico de criação:", historyError);
+      }
 
       // Enviar email de notificação
       if (companyIdToUse) {
@@ -349,6 +364,25 @@ export const ShipmentsProvider: React.FC<ShipmentsProviderProps> = ({
         updatePayload.companyId = updatedShipment.companyId;
       }
       await updateDoc(shipmentRef, updatePayload);
+
+      if (oldStatus !== updatedShipment.status) {
+        try {
+          await recordStatusHistory({
+            shipmentId: updatedShipment.id,
+            eventType: "status_change",
+            fromStatus: oldStatus,
+            toStatus: updatedShipment.status,
+            changedBy: currentUser?.uid || "system",
+            changedByName:
+              currentUser?.displayName ||
+              currentUser?.email ||
+              "Sistema",
+            companyId: updatedShipment.companyId,
+          });
+        } catch (historyError) {
+          console.error("Erro ao registrar histórico de status:", historyError);
+        }
+      }
 
       // Enviar notificações se o status mudou
       if (oldStatus !== updatedShipment.status) {
@@ -510,10 +544,8 @@ export const ShipmentsProvider: React.FC<ShipmentsProviderProps> = ({
   const canEditShipment = (shipment: Shipment): boolean => {
     if (!currentUser) return false;
 
-    // Admin pode editar qualquer shipment
-    if (isAdmin()) return true;
+    if (isAdmin() || currentUser.role === UserRole.OPERATOR) return true;
 
-    // Usuário de empresa só pode editar shipments da própria empresa
     if (currentUser.role === UserRole.COMPANY_USER) {
       return shipment.companyId === currentUser.companyId;
     }
@@ -522,7 +554,11 @@ export const ShipmentsProvider: React.FC<ShipmentsProviderProps> = ({
   };
 
   const canCreateShipment = (): boolean => {
-    return isAdmin() || currentUser?.role === UserRole.COMPANY_USER;
+    return (
+      isAdmin() ||
+      currentUser?.role === UserRole.OPERATOR ||
+      currentUser?.role === UserRole.COMPANY_USER
+    );
   };
 
   const deleteAllShipments = async () => {

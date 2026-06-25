@@ -10,6 +10,7 @@ import { useLanguage } from "../../context/language-context";
 import type { Shipment } from "../../context/shipments-context";
 import { db } from "../../lib/firebaseConfig";
 import { Cliente } from "../../types/customer";
+import { ShipmentTimeline } from "../shipment-timeline/shipment-timeline";
 import "./edit-shipment-modal.css";
 
 interface EditShipmentModalProps {
@@ -811,6 +812,12 @@ const EditShipmentModal = ({
                 </div>
               </div>
             </div>
+
+            {shipment.id && (
+              <div className="form-section">
+                <ShipmentTimeline shipmentId={shipment.id} />
+              </div>
+            )}
           </form>
         </div>
 

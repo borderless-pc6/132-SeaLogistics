@@ -66,11 +66,12 @@ export const AdminDashboard = () => {
   const [isExporting, setIsExporting] = useState(false);
   const [showAdminPanel, setShowAdminPanel] = useState(false);
   const [adminPanelTab, setAdminPanelTab] = useState<
-    "users" | "companies" | "shipments"
+    "users" | "companies" | "shipments" | "templates"
   >("users");
 
-  // Função para abrir o painel admin com uma aba específica
-  const openAdminPanel = (tab: "users" | "companies" | "shipments") => {
+  const openAdminPanel = (
+    tab: "users" | "companies" | "shipments" | "templates"
+  ) => {
     setAdminPanelTab(tab);
     setShowAdminPanel(true);
   };

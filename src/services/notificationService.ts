@@ -2,7 +2,8 @@ import { doc, getDoc } from 'firebase/firestore';
 import type { Shipment } from '../context/shipments-context';
 import { db } from '../lib/firebaseConfig';
 import { sendEmail } from './emailService';
-import { sendShipmentCreatedWhatsApp, sendStatusUpdateWhatsApp } from './whatsappService';
+import { renderEmailTemplate, renderWhatsAppTemplate } from './templateService';
+import { sendWhatsAppMessage, formatPhoneNumber } from './whatsappService';
 
 interface NotificationPreferences {
     email: boolean;
@@ -122,10 +123,14 @@ export const sendShipmentNotification = async (
             TEST_WHATSAPP_PHONE;
         
         if (whatsappNumber) {
-            results.whatsapp = await sendShipmentCreatedWhatsApp(
-                shipment,
-                whatsappNumber
+            const message = await renderWhatsAppTemplate(
+                'new_shipment_whatsapp',
+                shipment
             );
+            results.whatsapp = await sendWhatsAppMessage({
+                to: formatPhoneNumber(whatsappNumber),
+                message,
+            });
         } else {
             console.log(
                 'WhatsApp habilitado ou número de teste definido, mas nenhum número foi encontrado'
@@ -178,11 +183,15 @@ export const sendStatusUpdateNotification = async (
             );
         } else {
             console.log("[WhatsApp] Enviando atualização de status para:", whatsappNumber.replace(/(\d{4})\d+(\d{2})/, "$1****$2"));
-            results.whatsapp = await sendStatusUpdateWhatsApp(
+            const message = await renderWhatsAppTemplate(
+                'status_update_whatsapp',
                 shipment,
-                whatsappNumber,
-                oldStatus
+                { oldStatus }
             );
+            results.whatsapp = await sendWhatsAppMessage({
+                to: formatPhoneNumber(whatsappNumber),
+                message,
+            });
         }
     }
 
@@ -190,26 +199,10 @@ export const sendStatusUpdateNotification = async (
 };
 
 export const sendShipmentCreatedEmail = async (shipment: Shipment, clientEmail: string): Promise<boolean> => {
-    const subject = `Novo envio criado - ${shipment.numeroBl}`;
-    const html = `
-        <h2>Novo envio criado</h2>
-        <p>Olá,</p>
-        <p>Um novo envio foi criado com os seguintes detalhes:</p>
-        <ul>
-            <li><strong>Número BL:</strong> ${shipment.numeroBl}</li>
-            <li><strong>Cliente:</strong> ${shipment.cliente}</li>
-            <li><strong>Operador:</strong> ${shipment.operador}</li>
-            <li><strong>Porto de Origem:</strong> ${shipment.pol}</li>
-            <li><strong>Porto de Destino:</strong> ${shipment.pod}</li>
-            <li><strong>ETD Origem:</strong> ${shipment.etdOrigem}</li>
-            <li><strong>ETA Destino:</strong> ${shipment.etaDestino}</li>
-            <li><strong>Quantidade de Containers:</strong> ${shipment.quantBox}</li>
-            <li><strong>Status:</strong> ${shipment.status}</li>
-            <li><strong>Armador:</strong> ${shipment.armador}</li>
-            <li><strong>Booking:</strong> ${shipment.booking}</li>
-        </ul>
-        <p>Atenciosamente,<br>Sea Logistics</p>
-    `;
+    const { subject, html } = await renderEmailTemplate(
+        'new_shipment_email',
+        shipment
+    );
 
     return sendEmail({
         to: clientEmail,
@@ -219,21 +212,11 @@ export const sendShipmentCreatedEmail = async (shipment: Shipment, clientEmail: 
 };
 
 export const sendStatusUpdateEmail = async (shipment: Shipment, clientEmail: string, oldStatus: string): Promise<boolean> => {
-    const subject = `Status do envio atualizado - ${shipment.numeroBl}`;
-    const html = `
-        <h2>Status do envio atualizado</h2>
-        <p>Olá,</p>
-        <p>O status do seu envio foi atualizado:</p>
-        <ul>
-            <li><strong>Número BL:</strong> ${shipment.numeroBl}</li>
-            <li><strong>Status Anterior:</strong> ${oldStatus}</li>
-            <li><strong>Novo Status:</strong> ${shipment.status}</li>
-            <li><strong>Cliente:</strong> ${shipment.cliente}</li>
-            <li><strong>Porto de Origem:</strong> ${shipment.pol}</li>
-            <li><strong>Porto de Destino:</strong> ${shipment.pod}</li>
-        </ul>
-        <p>Atenciosamente,<br>Sea Logistics</p>
-    `;
+    const { subject, html } = await renderEmailTemplate(
+        'status_update_email',
+        shipment,
+        { oldStatus }
+    );
 
     return sendEmail({
         to: clientEmail,

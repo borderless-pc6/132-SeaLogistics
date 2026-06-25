@@ -15,6 +15,7 @@ export interface userCredentials {
 
 export enum UserRole {
   ADMIN = 'admin',
+  OPERATOR = 'operator',
   COMPANY_USER = 'company_user'
 }
 

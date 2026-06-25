@@ -3,11 +3,19 @@ import { Dashboard } from '../dashboard/dashboard';
 import { AdminDashboard } from '../dashboard/admin-dashboard';
 
 export const HomePage = () => {
-    const { isAdmin, loading } = useAuth();
+    const { isAdmin, isOperator, loading } = useAuth();
 
     if (loading) {
         return <div>Carregando...</div>;
     }
 
-    return isAdmin() ? <AdminDashboard /> : <Dashboard />;
+    if (isAdmin()) {
+        return <AdminDashboard />;
+    }
+
+    if (isOperator()) {
+        return <Dashboard />;
+    }
+
+    return <Dashboard />;
 }; 

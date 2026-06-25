@@ -13,6 +13,17 @@ service cloud.firestore {
              get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'admin';
     }
     
+    // Função para verificar se o usuário é operador
+    function isOperator() {
+      return isAuthenticated() && 
+             exists(/databases/$(database)/documents/users/$(request.auth.uid)) &&
+             get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'operator';
+    }
+
+    function isStaff() {
+      return isAdmin() || isOperator();
+    }
+    
     // Função para verificar se o usuário é da mesma empresa
     function isSameCompany(companyId) {
       return isAuthenticated() && 
@@ -43,22 +54,43 @@ service cloud.firestore {
     
     // Regras para a coleção de shipments
     match /shipments/{shipmentId} {
-      // Admins podem ler/escrever qualquer shipment
-      allow read, write: if isAdmin();
+      // Staff (admin/operador) pode ler/escrever qualquer shipment
+      allow read, write: if isStaff();
       
       // Usuários de empresa podem apenas ler e atualizar shipments da sua empresa
       allow read, update: if isAuthenticated() && 
                            exists(/databases/$(database)/documents/users/$(request.auth.uid)) &&
                            resource.data.companyId == get(/databases/$(database)/documents/users/$(request.auth.uid)).data.companyId;
       
-      // Apenas admins podem criar novos shipments
-      allow create: if isAdmin();
+      // Staff pode criar novos shipments
+      allow create: if isStaff();
     }
     
+    // Regras para histórico de status dos embarques
+    match /statusHistory/{historyId} {
+      allow read: if isStaff() ||
+        (isAuthenticated() &&
+         exists(/databases/$(database)/documents/users/$(request.auth.uid)) &&
+         resource.data.companyId == get(/databases/$(database)/documents/users/$(request.auth.uid)).data.companyId);
+
+      allow create: if isStaff() ||
+        (isAuthenticated() &&
+         exists(/databases/$(database)/documents/users/$(request.auth.uid)) &&
+         request.resource.data.companyId == get(/databases/$(database)/documents/users/$(request.auth.uid)).data.companyId);
+
+      allow update, delete: if isAdmin();
+    }
+
+    // Templates de notificação (apenas admin)
+    match /notificationTemplates/{templateId} {
+      allow read: if isStaff();
+      allow write: if isAdmin();
+    }
+
     // Regras para a coleção de documentos
     match /documents/{documentId} {
-      // Admins podem ler/escrever qualquer documento
-      allow read, write: if isAdmin();
+      // Staff pode ler/escrever qualquer documento
+      allow read, write: if isStaff();
       
       // Usuários de empresa podem ler documentos de shipments da sua empresa
       allow read: if isAuthenticated() && 
@@ -67,8 +99,7 @@ service cloud.firestore {
                    get(/databases/$(database)/documents/shipments/$(resource.data.shipmentId)).data.companyId == 
                    get(/databases/$(database)/documents/users/$(request.auth.uid)).data.companyId;
       
-      // Apenas admins podem criar, atualizar e deletar documentos
-      allow create, update, delete: if isAdmin();
+      allow create, update, delete: if isStaff();
     }
     
     // Regras padrão (negação para outras coleções)

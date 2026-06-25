@@ -21,6 +21,8 @@ declare module '@/context/auth-context' {
         login: (email: string, password: string) => Promise<void>;
         logout: () => void;
         isAdmin: () => boolean;
+        isOperator: () => boolean;
+        isStaff: () => boolean;
         isCompanyUser: () => boolean;
         canAccessAdminFeatures: () => boolean;
         canManageShipments: () => boolean;

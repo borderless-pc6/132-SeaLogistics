@@ -52,22 +52,22 @@ interface NovoEnvio {
 const NovoEnvioPage = () => {
   const navigate = useNavigate();
   const { addShipment } = useShipments();
-  const { currentUser, isAdmin } = useAuth();
+  const { currentUser, isStaff } = useAuth();
   const { isCollapsed } = useContext(NavbarContext);
   const { translations } = useLanguage();
   const { showError, showSuccess } = useToast();
 
   useEffect(() => {
-    const isAdminUser = isAdmin();
+    const isStaffUser = isStaff();
     const isCompanyUser = currentUser?.role === UserRole.COMPANY_USER;
 
-    if (!isAdminUser && !isCompanyUser) {
+    if (!isStaffUser && !isCompanyUser) {
       alert(
-        "Acesso negado. Apenas administradores e usuários de empresa podem criar novos shipments."
+        "Acesso negado. Apenas equipe operacional e usuários de empresa podem criar novos shipments."
       );
       navigate("/home");
     }
-  }, [isAdmin, currentUser?.role, navigate]);
+  }, [isStaff, currentUser?.role, navigate]);
 
   const [formData, setFormData] = useState<NovoEnvio>({
     clienteId: "",
@@ -113,9 +113,9 @@ const NovoEnvioPage = () => {
     const fetchClientes = async () => {
       setLoadingClientes(true);
       try {
-        const isAdminUser = isAdmin();
+        const isStaffUser = isStaff();
 
-        if (isAdminUser) {
+        if (isStaffUser) {
           // Admins see all non-admin users (companies)
           const usersQuery = query(
             collection(db, "users"),
@@ -162,19 +162,19 @@ const NovoEnvioPage = () => {
       }
     };
     fetchClientes();
-  }, [isAdmin, currentUser]);
+  }, [isStaff, currentUser]);
 
   // Buscar operadores admins do Firestore
   useEffect(() => {
     const fetchOperadores = async () => {
       setLoadingOperadores(true);
       try {
-        const adminsQuery = query(
+        const staffQuery = query(
           collection(db, "users"),
-          where("role", "==", "admin"),
+          where("role", "in", ["admin", "operator"]),
           where("isActive", "==", true)
         );
-        const snapshot = await getDocs(adminsQuery);
+        const snapshot = await getDocs(staffQuery);
         const operadoresData: Operador[] = snapshot.docs.map((doc) => {
           const data = doc.data();
           return {
@@ -281,10 +281,10 @@ const NovoEnvioPage = () => {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
 
-    const isAdminUser = isAdmin();
+    const isStaffUser = isStaff();
     const isCompanyUser = currentUser?.role === UserRole.COMPANY_USER;
 
-    if (!isAdminUser && !isCompanyUser) {
+    if (!isStaffUser && !isCompanyUser) {
       showError("Erro: Você não tem permissão para criar shipments.");
       return;
     }
@@ -368,10 +368,10 @@ const NovoEnvioPage = () => {
   };
 
   const clienteSelecionado = clientes.find((c) => c.id === formData.clienteId);
-  const isAdminUser = isAdmin();
+  const isStaffUser = isStaff();
   const isCompanyUser = currentUser?.role === UserRole.COMPANY_USER;
 
-  if (!isAdminUser && !isCompanyUser) {
+  if (!isStaffUser && !isCompanyUser) {
     return (
       <main className="novo-envio-main">
         <Navbar />
@@ -452,7 +452,7 @@ const NovoEnvioPage = () => {
               </div>
 
               <div className="form-row">
-                {isAdminUser && (
+                {isStaffUser && (
                   <div className="form-group">
                     <label htmlFor="clienteId">Cliente *</label>
                     <select

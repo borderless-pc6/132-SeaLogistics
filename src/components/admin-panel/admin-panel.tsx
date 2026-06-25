@@ -17,11 +17,12 @@ import type { Shipment } from "../../context/shipments-context";
 import { db } from "../../lib/firebaseConfig";
 import { type Company, type User, UserRole } from "../../types/user";
 import { hashPassword } from "../../utils/passwordUtils";
+import { TemplateEditor } from "../template-editor/template-editor";
 import "./admin-panel.css";
 
 interface AdminPanelProps {
   onClose: () => void;
-  initialTab?: "users" | "companies" | "shipments";
+  initialTab?: "users" | "companies" | "shipments" | "templates";
 }
 
 export const AdminPanel: React.FC<AdminPanelProps> = ({ onClose, initialTab }) => {
@@ -32,7 +33,7 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({ onClose, initialTab }) =
   const [shipments, setShipments] = useState<Shipment[]>([]);
   const [loading, setLoading] = useState(true);
   const [activeTab, setActiveTab] = useState<
-    "users" | "companies" | "shipments"
+    "users" | "companies" | "shipments" | "templates"
   >(initialTab || "users");
 
 
@@ -435,6 +436,13 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({ onClose, initialTab }) =
           >
             {translations.shipments} ({shipments.length})
           </button>
+          <button
+            className={`tab-button ${activeTab === "templates" ? "active" : ""}`}
+            onClick={() => setActiveTab("templates")}
+            data-tab="templates"
+          >
+            Templates
+          </button>
         </div>
 
         {activeTab === "users" && (
@@ -483,11 +491,16 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({ onClose, initialTab }) =
                       <td>{user.email}</td>
                       <td>
                         <span className={`role-badge ${user.role}`}>
-                          {user.role === UserRole.ADMIN ? translations.admin : translations.companyLabel}
+                          {user.role === UserRole.ADMIN
+                            ? translations.admin
+                            : user.role === UserRole.OPERATOR
+                            ? "Operador"
+                            : translations.companyLabel}
                         </span>
                       </td>
                       <td>
-                        {user.role === UserRole.ADMIN ? (
+                        {user.role === UserRole.ADMIN ||
+                        user.role === UserRole.OPERATOR ? (
                           "-"
                         ) : (
                           <select
@@ -642,6 +655,14 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({ onClose, initialTab }) =
             </div>
           </div>
         )}
+
+        {activeTab === "templates" && (
+          <div className="admin-section">
+            <h3>Templates de Notificação</h3>
+            <TemplateEditor />
+          </div>
+        )}
+
         {/* Modal de Criação de Usuário */}
         {showCreateUserModal && (
           <div className="admin-panel" style={{ zIndex: 1100 }}>
@@ -668,7 +689,7 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({ onClose, initialTab }) =
                   >
                     {translations.userType}
                   </label>
-                  <div style={{ display: "flex", gap: "1rem" }}>
+                  <div style={{ display: "flex", gap: "1rem", flexWrap: "wrap" }}>
                     <label
                       style={{
                         display: "flex",
@@ -734,6 +755,39 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({ onClose, initialTab }) =
                         style={{ margin: 0 }}
                       />
                       {translations.administrator}
+                    </label>
+                    <label
+                      style={{
+                        display: "flex",
+                        alignItems: "center",
+                        gap: "0.5rem",
+                        cursor: "pointer",
+                        padding: "0.5rem 1rem",
+                        border: "2px solid #e1e5e9",
+                        borderRadius: "8px",
+                        backgroundColor:
+                          newUserData.role === UserRole.OPERATOR
+                            ? "#e6f3ff"
+                            : "white",
+                        borderColor:
+                          newUserData.role === UserRole.OPERATOR
+                            ? "#0066cc"
+                            : "#e1e5e9",
+                      }}
+                    >
+                      <input
+                        type="radio"
+                        name="userType"
+                        checked={newUserData.role === UserRole.OPERATOR}
+                        onChange={() =>
+                          setNewUserData({
+                            ...newUserData,
+                            role: UserRole.OPERATOR,
+                          })
+                        }
+                        style={{ margin: 0 }}
+                      />
+                      Operador
                     </label>
                   </div>
                 </div>

@@ -31,6 +31,8 @@ interface AuthContextType {
   login: (email: string, password: string) => Promise<void>;
   logout: () => void;
   isAdmin: () => boolean;
+  isOperator: () => boolean;
+  isStaff: () => boolean;
   isCompanyUser: () => boolean;
   canAccessAdminFeatures: () => boolean;
   canManageShipments: () => boolean;
@@ -468,6 +470,15 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
     return currentUser.role === UserRole.ADMIN;
   };
 
+  const isOperator = (): boolean => {
+    if (!currentUser) return false;
+    return currentUser.role === UserRole.OPERATOR;
+  };
+
+  const isStaff = (): boolean => {
+    return isAdmin() || isOperator();
+  };
+
   const isCompanyUser = () => {
     return currentUser?.role === UserRole.COMPANY_USER;
   };
@@ -477,12 +488,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
   };
 
   const canManageShipments = () => {
-    // Admins podem gerenciar todos os shipments
-    // Usuários de empresa só podem gerenciar os próprios
-    return (
-      currentUser?.role === UserRole.ADMIN ||
-      currentUser?.role === UserRole.COMPANY_USER
-    );
+    return isStaff() || currentUser?.role === UserRole.COMPANY_USER;
   };
 
   const value: AuthContextType = {
@@ -491,6 +497,8 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
     login,
     logout,
     isAdmin,
+    isOperator,
+    isStaff,
     isCompanyUser,
     canAccessAdminFeatures,
     canManageShipments,

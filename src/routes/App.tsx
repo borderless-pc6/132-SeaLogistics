@@ -2,7 +2,7 @@ import { Route, BrowserRouter as Router, Routes } from "react-router-dom";
 import ExcelSpecificTest from "../components/excel-specific-test/excel-specific-test";
 import { Footer } from "../components/footer/footer";
 import { NavbarProvider } from "../components/navbar/navbar-provider";
-import { AdminRoute, PrivateRoute } from "../components/protected-route";
+import { AdminRoute, PrivateRoute, StaffRoute } from "../components/protected-route";
 import { AuthProvider } from "../context/auth-context";
 import { LanguageProvider } from "../context/language-context";
 import { ShipmentsProvider } from "../context/shipments-context";
@@ -60,9 +60,9 @@ export const App = () => {
                   <Route
                     path="/novo-envio"
                     element={
-                      <AdminRoute>
+                      <StaffRoute>
                         <NovoEnvioPage />
-                      </AdminRoute>
+                      </StaffRoute>
                     }
                   />
                   <Route
