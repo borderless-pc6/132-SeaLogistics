@@ -5,6 +5,7 @@ import jsPDF from "jspdf";
 import "jspdf-autotable";
 import { Check, Edit, Eye, FileSpreadsheet, FileText, FolderOpen, History, Ship } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
+import { useNavigate } from "react-router-dom";
 import { useAuth } from "../../context/auth-context";
 import { useLanguage } from "../../context/language-context";
 import { useShipments, type Shipment } from "../../context/shipments-context";
@@ -47,6 +48,7 @@ const ShippingTable = ({
   } = useShipments();
   const { isAdmin, isStaff } = useAuth();
   const { translations } = useLanguage();
+  const navigate = useNavigate();
 
   const shipments = propShipments || contextShipments;
 
@@ -501,7 +503,19 @@ const ShippingTable = ({
                     <td>{formatDate(shipment.etaDestino)}</td>
                     <td>{shipment.currentLocation || "-"}</td>
                     <td>{shipment.quantBox}</td>
-                    <td>{shipment.numeroBl}</td>
+                    <td>
+                      {shipment.id ? (
+                        <button
+                          type="button"
+                          className="bl-link"
+                          onClick={() => navigate(`/envios/${shipment.id}`)}
+                        >
+                          {shipment.numeroBl}
+                        </button>
+                      ) : (
+                        shipment.numeroBl
+                      )}
+                    </td>
                     <td>{shipment.operador}</td>
                     <td>{shipment.booking}</td>
                     <td>{shipment.invoice || "-"}</td>
@@ -558,6 +572,17 @@ const ShippingTable = ({
                           </>
                         )}
 
+                        <Tooltip content={translations.viewDetails || "Ver detalhes"}>
+                          <button
+                            className="action-icon view-icon smooth-transition"
+                            onClick={() =>
+                              shipment.id && navigate(`/envios/${shipment.id}`)
+                            }
+                          >
+                            <Eye size={20} />
+                          </button>
+                        </Tooltip>
+
                         {!isStaff() && (
                           <Tooltip content={translations.viewDocuments}>
                             <button
@@ -567,7 +592,7 @@ const ShippingTable = ({
                                 setShowDocumentViewer(true);
                               }}
                             >
-                              <Eye size={20} />
+                              <FileText size={20} />
                             </button>
                           </Tooltip>
                         )}

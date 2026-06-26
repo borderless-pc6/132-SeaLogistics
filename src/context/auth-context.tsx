@@ -7,6 +7,11 @@ import {
   setDoc,
   where,
 } from "firebase/firestore";
+import {
+  onAuthStateChanged,
+  signInWithCustomToken,
+  signOut,
+} from "firebase/auth";
 import React, {
   createContext,
   ReactNode,
@@ -15,7 +20,13 @@ import React, {
   useRef,
   useState,
 } from "react";
-import { db } from "../lib/firebaseConfig";
+import { auth, db } from "../lib/firebaseConfig";
+import {
+  clearAuthToken,
+  getAuthToken,
+  loginWithApi,
+  storeAuthToken,
+} from "../services/authApi";
 import { Company, User, UserRole } from "../types/user";
 import {
   isRetryableAuthError,
@@ -62,26 +73,46 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
   const tokenCheckIntervalRef = useRef<NodeJS.Timeout | null>(null);
 
   useEffect(() => {
-    // Verificar se há usuário salvo no localStorage
-    const savedUser = localStorage.getItem("currentUser");
-    if (savedUser) {
-      try {
-        const userData = JSON.parse(savedUser);
-        console.log("Carregando dados do localStorage:", userData);
-        if (userData.id) {
-          loadUserData(userData.id);
-        } else {
-          console.warn("ID do usuário não encontrado no localStorage");
+    const unsubscribe = onAuthStateChanged(auth, async (firebaseUser) => {
+      if (firebaseUser) {
+        try {
+          await loadUserData(firebaseUser.uid);
+        } catch {
           setLoading(false);
         }
-      } catch (error) {
-        console.error("Error parsing saved user:", error);
-        localStorage.removeItem("currentUser");
-        setLoading(false);
+        return;
       }
-    } else {
+
+      const savedUser = localStorage.getItem("currentUser");
+      const savedToken = getAuthToken();
+
+      if (savedUser && savedToken) {
+        try {
+          const userData = JSON.parse(savedUser);
+          if (userData.id) {
+            await loadUserData(userData.id);
+            return;
+          }
+        } catch {
+          localStorage.removeItem("currentUser");
+          clearAuthToken();
+        }
+      } else if (savedUser) {
+        try {
+          const userData = JSON.parse(savedUser);
+          if (userData.id) {
+            await loadUserData(userData.id);
+            return;
+          }
+        } catch {
+          localStorage.removeItem("currentUser");
+        }
+      }
+
       setLoading(false);
-    }
+    });
+
+    return () => unsubscribe();
   }, []);
 
   const loadUserData = async (userId: string) => {
@@ -225,6 +256,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
           setCurrentUser(null);
           setCurrentCompany(null);
           localStorage.removeItem("currentUser");
+          clearAuthToken();
           return;
         }
 
@@ -241,6 +273,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
           setCurrentUser(null);
           setCurrentCompany(null);
           localStorage.removeItem("currentUser");
+          clearAuthToken();
           return;
         }
 
@@ -305,6 +338,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
           setCurrentUser(null);
           setCurrentCompany(null);
           localStorage.removeItem("currentUser");
+          clearAuthToken();
         }
       }
     }, 5 * 60 * 1000); // 5 minutos
@@ -319,14 +353,67 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
 
   const login = async (email: string, password: string) => {
     try {
-      // Autenticação customizada com validação de senha via hash SHA-256
-      // Em produção, considere migrar para Firebase Auth para recursos adicionais
-      console.log(
-        "Attempting login with password:",
-        password ? "***" : "no password"
-      );
+      // Tenta login via API (JWT + Firebase custom token)
+      try {
+        const apiResult = await loginWithApi(email, password);
 
-      // Usa retry para erros de rede
+        if (apiResult.success && apiResult.user && apiResult.token) {
+          storeAuthToken(apiResult.token);
+
+          if (apiResult.firebaseCustomToken) {
+            await signInWithCustomToken(auth, apiResult.firebaseCustomToken);
+          }
+
+          const finalUserData = {
+            ...apiResult.user,
+            uid: apiResult.user.uid,
+          } as User;
+
+          setCurrentUser(finalUserData);
+
+          if (
+            finalUserData.role === UserRole.COMPANY_USER &&
+            finalUserData.companyId
+          ) {
+            const companyDoc = await getDoc(
+              doc(db, "companies", finalUserData.companyId)
+            );
+            if (companyDoc.exists()) {
+              setCurrentCompany({
+                ...companyDoc.data(),
+                id: companyDoc.id,
+              } as Company);
+            }
+          }
+
+          localStorage.setItem(
+            "currentUser",
+            JSON.stringify({
+              email: finalUserData.email,
+              name: finalUserData.displayName,
+              id: finalUserData.uid,
+              role: finalUserData.role,
+            })
+          );
+          return;
+        }
+      } catch (apiError) {
+        const message =
+          apiError instanceof Error ? apiError.message : String(apiError);
+        if (
+          !message.includes("não configurado") &&
+          !message.includes("Failed to fetch") &&
+          !message.includes("NetworkError")
+        ) {
+          throw apiError;
+        }
+        console.warn(
+          "API de auth indisponível, usando fallback local:",
+          message
+        );
+      }
+
+      // Fallback: autenticação direta via Firestore (legado)
       const querySnapshot = await retryWithBackoff(
         async () => {
           const usersQuery = query(
@@ -450,18 +537,24 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
     }
   };
 
-  const logout = () => {
+  const logout = async () => {
     console.log("Fazendo logout...");
 
-    // Limpa intervalo de verificação
     if (tokenCheckIntervalRef.current) {
       clearInterval(tokenCheckIntervalRef.current);
       tokenCheckIntervalRef.current = null;
     }
 
+    try {
+      await signOut(auth);
+    } catch {
+      // ignora se não havia sessão Firebase
+    }
+
     setCurrentUser(null);
     setCurrentCompany(null);
     localStorage.removeItem("currentUser");
+    clearAuthToken();
     lastTokenCheckRef.current = 0;
   };
 

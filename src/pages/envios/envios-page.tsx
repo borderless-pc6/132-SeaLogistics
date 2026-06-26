@@ -82,7 +82,7 @@ export const EnviosPage = () => {
           <div className="excel-controls">
             <div className="excel-controls-header">
               <h3>
-                <FileUp size={22} /> Importação CSV
+                <FileUp size={22} /> Importação CSV / Excel
               </h3>
               <button
                 className={`excel-toggle-btn ${

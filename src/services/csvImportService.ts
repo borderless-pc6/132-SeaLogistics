@@ -132,13 +132,21 @@ function parseRow(
   };
 }
 
-export async function parseCSVFile(file: File): Promise<ShipmentImportRow[]> {
-  const text = await file.text();
-  const workbook = XLSX.read(text, { type: "string" });
+export async function parseSpreadsheetFile(
+  file: File
+): Promise<ShipmentImportRow[]> {
+  const isExcel =
+    file.name.toLowerCase().endsWith(".xlsx") ||
+    file.name.toLowerCase().endsWith(".xls");
+
+  const workbook = isExcel
+    ? XLSX.read(await file.arrayBuffer(), { type: "array" })
+    : XLSX.read(await file.text(), { type: "string" });
+
   const sheetName = workbook.SheetNames[0];
 
   if (!sheetName) {
-    throw new Error("Arquivo CSV vazio ou inválido");
+    throw new Error("Arquivo vazio ou inválido");
   }
 
   const sheet = workbook.Sheets[sheetName];
@@ -147,7 +155,7 @@ export async function parseCSVFile(file: File): Promise<ShipmentImportRow[]> {
   });
 
   if (jsonRows.length === 0) {
-    throw new Error("Nenhuma linha de dados encontrada no CSV");
+    throw new Error("Nenhuma linha de dados encontrada no arquivo");
   }
 
   const parsed = jsonRows
@@ -156,11 +164,16 @@ export async function parseCSVFile(file: File): Promise<ShipmentImportRow[]> {
 
   if (parsed.length === 0) {
     throw new Error(
-      "Nenhum registro válido encontrado. Verifique se o CSV possui colunas como cliente, numeroBl ou bl."
+      "Nenhum registro válido encontrado. Verifique se o arquivo possui colunas como cliente, numeroBl ou bl."
     );
   }
 
   return parsed;
+}
+
+/** @deprecated Use parseSpreadsheetFile */
+export async function parseCSVFile(file: File): Promise<ShipmentImportRow[]> {
+  return parseSpreadsheetFile(file);
 }
 
 export const CSV_TEMPLATE_HEADERS = [
@@ -184,6 +197,34 @@ export const CSV_TEMPLATE_HEADERS = [
 ];
 
 export function downloadCSVTemplate(): void {
+  const workbook = XLSX.utils.book_new();
+  const sheet = XLSX.utils.aoa_to_sheet([
+    CSV_TEMPLATE_HEADERS,
+    [
+      "Empresa Exemplo",
+      "Marítimo",
+      "Shipper SA",
+      "Operador Log",
+      "Santos",
+      "Rotterdam",
+      "2026-01-15",
+      "2026-02-20",
+      "Em trânsito",
+      "2",
+      "BL123456",
+      "MSC",
+      "BK789",
+      "INV001",
+      "em-transito",
+      "9735206",
+      "",
+    ],
+  ]);
+  XLSX.utils.book_append_sheet(workbook, sheet, "Embarques");
+  XLSX.writeFile(workbook, "template-importacao-embarques.xlsx");
+}
+
+export function downloadCSVTemplateLegacy(): void {
   const workbook = XLSX.utils.book_new();
   const sheet = XLSX.utils.aoa_to_sheet([
     CSV_TEMPLATE_HEADERS,

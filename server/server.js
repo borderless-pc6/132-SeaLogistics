@@ -1,12 +1,23 @@
 const path = require("path");
-const express = require("express");
-const nodemailer = require("nodemailer");
-const cors = require("cors");
 const dotenv = require("dotenv");
-const twilio = require("twilio");
 
-// Configurar dotenv - .env na raiz do projeto (pasta pai de server/)
+// Carregar .env ANTES de qualquer módulo que use process.env
 dotenv.config({ path: path.join(__dirname, "..", ".env") });
+dotenv.config({ path: path.join(__dirname, ".env") });
+
+const express = require("express");
+const cors = require("cors");
+const twilio = require("twilio");
+const authRoutes = require("./routes/auth");
+const shipmentRoutes = require("./routes/shipments");
+const {
+  sendEmail,
+  verifyEmailConnection,
+  getEmailProviderInfo,
+} = require("./services/emailService");
+const { initFirebaseAdmin } = require("./services/firebaseAdmin");
+
+initFirebaseAdmin();
 
 // Criar app Express
 const app = express();
@@ -25,6 +36,7 @@ const allowedOrigins = [
   "https://132-sealogistics.netlify.app",
   "http://localhost:3000",
   "http://localhost:3001",
+  "http://localhost:5173",
 ];
 
 // Configurar CORS
@@ -41,7 +53,7 @@ app.use(
         callback(new Error("Origem não permitida pelo CORS"));
       }
     },
-    methods: ["GET", "POST", "OPTIONS"],
+    methods: ["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
     allowedHeaders: ["Content-Type", "Authorization"],
     credentials: true,
   })
@@ -53,25 +65,17 @@ app.use((req, res, next) => {
   if (allowedOrigins.includes(origin)) {
     res.header("Access-Control-Allow-Origin", origin);
   }
-  res.header("Access-Control-Allow-Methods", "GET, POST, OPTIONS");
+  res.header("Access-Control-Allow-Methods", "GET, POST, PUT, PATCH, DELETE, OPTIONS");
   res.header("Access-Control-Allow-Headers", "Content-Type, Authorization");
   res.header("Access-Control-Allow-Credentials", "true");
   next();
 });
 
-// Configuração otimizada do transporter do Nodemailer
-const transporter = nodemailer.createTransport({
-  pool: true,
-  maxConnections: 1,
-  maxMessages: 3,
-  rateDelta: 1000,
-  rateLimit: 3,
-  service: "gmail",
-  auth: {
-    user: process.env.VITE_EMAIL_USER,
-    pass: process.env.VITE_EMAIL_APP_PASSWORD,
-  },
-});
+// Rotas de autenticação (JWT + Firebase custom token)
+app.use("/api/auth", authRoutes);
+
+// API REST de embarques (JWT)
+app.use("/api/shipments", shipmentRoutes);
 
 // Rota raiz
 app.get("/", (req, res) => {
@@ -89,7 +93,7 @@ app.get("/health", (req, res) => {
     timestamp: new Date().toISOString(),
     env: {
       NODE_ENV: process.env.NODE_ENV,
-      hasEmailConfig: !!process.env.VITE_EMAIL_USER,
+      email: getEmailProviderInfo(),
     },
   });
 });
@@ -101,26 +105,11 @@ app.post("/send-email", async (req, res) => {
     console.log("Corpo da requisição:", req.body);
     const { to, subject, html } = req.body;
 
-    const mailOptions = {
-      from: {
-        name: "Sea Logistics",
-        address: process.env.VITE_EMAIL_USER,
-      },
-      to,
-      subject,
-      html,
-      headers: {
-        Precedence: "bulk",
-        "X-Auto-Response-Suppress": "All",
-        "Auto-Submitted": "auto-generated",
-      },
-    };
-
-    const info = await transporter.sendMail(mailOptions);
-    console.log("Email enviado com sucesso:", info.messageId);
+    const result = await sendEmail({ to, subject, html });
+    console.log("Email enviado com sucesso:", result.messageId, `(${result.provider})`);
     console.log("=== EMAIL ENVIADO COM SUCESSO ===");
 
-    res.json({ success: true, messageId: info.messageId });
+    res.json({ success: true, messageId: result.messageId, provider: result.provider });
   } catch (error) {
     console.error("=== ERRO AO ENVIAR EMAIL ===");
     console.error("Detalhes do erro:", error);
@@ -132,9 +121,9 @@ app.post("/send-email", async (req, res) => {
 app.get("/api/verify-email", async (req, res) => {
   try {
     console.log("=== VERIFICANDO CONEXÃO DE EMAIL ===");
-    await transporter.verify();
+    const result = await verifyEmailConnection();
     console.log("=== CONEXÃO VERIFICADA COM SUCESSO ===");
-    res.json({ success: true });
+    res.json({ success: true, provider: result.provider });
   } catch (error) {
     console.error("=== ERRO AO VERIFICAR CONEXÃO ===");
     console.error("Detalhes do erro:", error);
@@ -702,7 +691,9 @@ const port = process.env.PORT || 3001;
 // Iniciar o servidor
 app.listen(port, "0.0.0.0", () => {
   console.log("==================================");
-  console.log(`Servidor rodando na porta ${port}`);
+  console.log(`Servidor API rodando na porta ${port}`);
+  console.log(`  Health:  http://localhost:${port}/health`);
+  console.log(`  Frontend (dev): http://localhost:5173  ← abra no navegador`);
   console.log("Origens permitidas:", allowedOrigins);
   console.log("==================================");
 });

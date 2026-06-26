@@ -6,7 +6,7 @@ import { useShipments } from "../../context/shipments-context";
 import { getStatusLabel } from "../../constants/statusOptions";
 import {
   downloadCSVTemplate,
-  parseCSVFile,
+  parseSpreadsheetFile,
   type ShipmentImportRow,
 } from "../../services/csvImportService";
 import "./csv-import.css";
@@ -30,12 +30,12 @@ export function CsvImport() {
     setFileName(file.name);
 
     try {
-      const rows = await parseCSVFile(file);
+      const rows = await parseSpreadsheetFile(file);
       setPreview(rows);
     } catch (err) {
       setPreview([]);
       setError(
-        err instanceof Error ? err.message : "Erro ao processar arquivo CSV"
+        err instanceof Error ? err.message : "Erro ao processar arquivo"
       );
     }
 
@@ -84,8 +84,8 @@ export function CsvImport() {
   return (
     <div className="csv-import">
       <p className="csv-import-hint">
-        Faça upload de um arquivo CSV para importar embarques em lote. Use o
-        template para garantir o formato correto das colunas.
+        Faça upload de um arquivo CSV ou Excel (.xlsx) para importar embarques
+        em lote. Use o template para garantir o formato correto das colunas.
       </p>
 
       <div className="csv-import-actions">
@@ -95,13 +95,13 @@ export function CsvImport() {
           onClick={downloadCSVTemplate}
         >
           <Download size={16} />
-          Baixar Template CSV
+          Baixar Template Excel
         </button>
 
         <input
           ref={fileInputRef}
           type="file"
-          accept=".csv,text/csv"
+          accept=".csv,.xlsx,.xls,text/csv,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
           className="csv-import-file-input"
           onChange={handleFileSelect}
           disabled={importing}
@@ -114,7 +114,7 @@ export function CsvImport() {
           disabled={importing}
         >
           <FileUp size={16} />
-          Selecionar CSV
+          Selecionar arquivo
         </button>
 
         {preview.length > 0 && (

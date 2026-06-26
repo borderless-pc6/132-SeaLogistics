@@ -10,8 +10,14 @@ export default defineConfig(({ mode }) => {
   return {
     plugins: [react()],
     server: {
-      port: 3000,
-      host: true
+      port: 5173,
+      strictPort: false,
+      host: true,
+      proxy: {
+        "/api": "http://localhost:3001",
+        "/send-email": "http://localhost:3001",
+        "/health": "http://localhost:3001",
+      },
     },
     resolve: {
       alias: {
