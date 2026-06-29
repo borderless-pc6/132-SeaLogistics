@@ -42,7 +42,7 @@ export const SkeletonLoader: React.FC<SkeletonLoaderProps> = ({
       <div
         className={`skeleton-loader ${getSkeletonClass()} ${className}`}
         style={style}
-        aria-label="Loading..."
+        aria-label="Carregando..."
       />
     );
   }
@@ -54,7 +54,7 @@ export const SkeletonLoader: React.FC<SkeletonLoaderProps> = ({
           key={index}
           className={`skeleton-loader ${getSkeletonClass()} ${className}`}
           style={style}
-          aria-label="Loading..."
+          aria-label="Carregando..."
         />
       ))}
     </>

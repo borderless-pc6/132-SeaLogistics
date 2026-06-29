@@ -273,6 +273,57 @@
   transition: opacity var(--transition-speed) ease;
 }
 
+.navbar-logout {
+  margin-top: auto;
+  padding-top: 16px;
+  border-top: 1px solid rgba(255, 255, 255, 0.15);
+  width: 100%;
+}
+
+.logout-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+  width: 100%;
+  min-height: 52px;
+  padding: 14px 16px;
+  border: none;
+  border-radius: 14px;
+  background: linear-gradient(135deg, #e53935 0%, #c62828 100%);
+  color: #ffffff;
+  font-size: 15px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  box-shadow: 0 4px 12px rgba(198, 40, 40, 0.35);
+}
+
+.logout-btn:hover {
+  background: linear-gradient(135deg, #ef5350 0%, #d32f2f 100%);
+  transform: translateY(-1px);
+  box-shadow: 0 6px 16px rgba(198, 40, 40, 0.45);
+}
+
+.logout-btn:active {
+  transform: translateY(0);
+  box-shadow: 0 2px 8px rgba(198, 40, 40, 0.3);
+}
+
+.logout-btn .nav-text {
+  color: #ffffff;
+  opacity: 1;
+  transform: none;
+}
+
+.collapsed .logout-btn {
+  padding: 14px 12px;
+}
+
+.collapsed .logout-btn .nav-text.hidden {
+  display: none;
+}
+
 .collapsed .navbar-footer {
   opacity: 0;
   pointer-events: none;
@@ -369,7 +420,8 @@
 
 /* Focus styles for accessibility */
 .toggle-btn:focus,
-.nav-item:focus {
+.nav-item:focus,
+.logout-btn:focus {
   outline: 2px solid rgba(255, 255, 255, 0.6);
   outline-offset: 2px;
 }

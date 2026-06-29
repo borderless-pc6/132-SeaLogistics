@@ -1,5 +1,6 @@
 import { AlertCircle, Check, ChevronDown, X } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
+import { isValidStatusTransition } from "../../utils/statusTransitions";
 import { useDropdown } from "./dropdown-context";
 import "./status-selector.css";
 
@@ -175,6 +176,14 @@ const StatusSelector = ({
 
   const handleConfirmChange = async () => {
     if (pendingStatus) {
+      const check = isValidStatusTransition(currentStatus, pendingStatus);
+      if (!check.valid) {
+        alert(check.reason || "Transição de status inválida.");
+        setShowConfirmation(false);
+        setPendingStatus("");
+        return;
+      }
+
       setIsUpdating(true);
       try {
         await onStatusChange(pendingStatus);

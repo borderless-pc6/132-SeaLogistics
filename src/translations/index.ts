@@ -525,8 +525,8 @@ export const translations = {
     expandMenu: "Expandir menu",
 
     // Dashboard
-    administrativeDashboard: "Dashboard Administrativo",
-    welcomeAdmin: "Bem-vindo, Usuario Admin!",
+    administrativeDashboard: "Painel Administrativo",
+    welcomeAdmin: "Bem-vindo, Usuário Admin!",
     overview: "Visão Geral",
     analytics: "Análises",
     advancedFilters: "Filtros Avançados",

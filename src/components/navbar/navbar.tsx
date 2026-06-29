@@ -1,6 +1,6 @@
 "use client";
 
-import { ChevronLeft, ChevronRight, Home, Plus, Settings, Ship, X } from "lucide-react";
+import { ChevronLeft, ChevronRight, Home, LogOut, Plus, Settings, Ship } from "lucide-react";
 import { useContext, useState } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
 import logo2 from "../../assets/logo2.png";
@@ -120,23 +120,21 @@ const Navbar = () => {
               {translations.configuracoes}
             </span>
           </div>
+        </nav>
 
-          {/* Botão de Logout */}
-          <div
-            className="nav-item logout"
+        <div className="navbar-logout">
+          <button
+            type="button"
+            className="logout-btn"
             onClick={handleLogout}
-            role="button"
-            tabIndex={0}
-            onKeyDown={(e) => e.key === "Enter" && handleLogout()}
+            aria-label={translations.sair}
           >
-            <div className="icon-container">
-              <X size={20} />
-            </div>
+            <LogOut size={20} />
             <span className={`nav-text ${!isCollapsed ? "visible" : "hidden"}`}>
               {translations.sair}
             </span>
-          </div>
-        </nav>
+          </button>
+        </div>
       </div>
 
       {/* Painel Administrativo Modal */}

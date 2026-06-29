@@ -7,10 +7,10 @@
 
 .excel-integration-page-content {
     flex: 1;
-    margin-left: 280px;
+    margin-left: var(--page-content-offset);
     padding: 2rem;
     transition: margin-left 0.3s ease;
-    max-width: calc(100% - 280px);
+    max-width: calc(100% - var(--page-content-offset));
     padding-bottom: 100px; /* Espaço para o footer */
 }
 
@@ -87,17 +87,8 @@
 }
 
 /* Responsive */
-@media (max-width: 1024px) {
-    .excel-integration-page-content {
-        margin-left: 80px;
-        max-width: calc(100% - 80px);
-    }
-}
-
 @media (max-width: 768px) {
     .excel-integration-page-content {
-        margin-left: 0;
-        max-width: 100%;
         padding: 1rem;
     }
 

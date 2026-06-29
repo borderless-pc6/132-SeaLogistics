@@ -1,5 +1,6 @@
 @import "./utils/colors.css";
 @import "./utils/animations.css";
+@import "./styles/navbar-layout.css";
 
 /* Reset e estilos base */
 * {

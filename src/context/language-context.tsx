@@ -21,14 +21,24 @@ export const LanguageContext = createContext<LanguageContextType | undefined>(
 );
 
 export function LanguageProvider({ children }: { children: ReactNode }) {
-    const [language, setLanguageState] = useState<Language>("en");
+    const getInitialLanguage = (): Language => {
+        if (typeof window === "undefined") {
+            return "pt";
+        }
 
-    useEffect(() => {
         const savedLang = localStorage.getItem("language") as Language;
         if (savedLang && ["en", "pt", "es"].includes(savedLang)) {
-            setLanguageState(savedLang);
+            return savedLang;
         }
-    }, []);
+
+        return "pt";
+    };
+
+    const [language, setLanguageState] = useState<Language>(getInitialLanguage);
+
+    useEffect(() => {
+        document.documentElement.lang = language === "pt" ? "pt-BR" : language;
+    }, [language]);
 
     const setLanguage = (lang: Language) => {
         setLanguageState(lang);

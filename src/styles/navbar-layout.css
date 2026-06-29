@@ -1,0 +1,38 @@
+/* Offsets do conteúdo principal conforme largura da navbar (navbar.css) */
+:root {
+  --page-content-offset: 320px; /* 20px margem + 280px navbar + 20px gap */
+}
+
+:root[data-navbar-collapsed="true"] {
+  --page-content-offset: 128px; /* 20px margem + 88px navbar + 20px gap */
+}
+
+@media (max-width: 1024px) {
+  :root {
+    --page-content-offset: 296px; /* 16px + 260px + 20px */
+  }
+
+  :root[data-navbar-collapsed="true"] {
+    --page-content-offset: 116px; /* 16px + 80px + 20px */
+  }
+}
+
+@media (max-width: 768px) {
+  :root {
+    --page-content-offset: 272px; /* 12px + 240px + 20px */
+  }
+
+  :root[data-navbar-collapsed="true"] {
+    --page-content-offset: 104px; /* 12px + 72px + 20px */
+  }
+}
+
+@media (max-width: 480px) {
+  :root {
+    --page-content-offset: 248px; /* 8px + 220px + 20px */
+  }
+
+  :root[data-navbar-collapsed="true"] {
+    --page-content-offset: 92px; /* 8px + 64px + 20px */
+  }
+}

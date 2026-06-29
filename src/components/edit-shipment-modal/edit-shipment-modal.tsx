@@ -11,6 +11,8 @@ import type { Shipment } from "../../context/shipments-context";
 import { db } from "../../lib/firebaseConfig";
 import { Cliente } from "../../types/customer";
 import { ShipmentTimeline } from "../shipment-timeline/shipment-timeline";
+import { CONTAINER_TYPES } from "../../utils/shipmentFormatters";
+import { isValidStatusTransition } from "../../utils/statusTransitions";
 import "./edit-shipment-modal.css";
 
 interface EditShipmentModalProps {
@@ -40,6 +42,14 @@ interface FormData {
   imo: string;
   actualDeparture: string;
   reportedEta: string;
+  navio: string;
+  containerType: string;
+  cargoReady: string;
+  coleta: string;
+  emptyToShipper: string;
+  readyToLoad: string;
+  loadedOnBoard: string;
+  destinoRumo: string;
 }
 
 const STATUS_OPTIONS = [
@@ -84,6 +94,14 @@ const EditShipmentModal = ({
     imo: "",
     actualDeparture: "",
     reportedEta: "",
+    navio: "",
+    containerType: "40HC",
+    cargoReady: "",
+    coleta: "",
+    emptyToShipper: "",
+    readyToLoad: "",
+    loadedOnBoard: "",
+    destinoRumo: "",
   });
 
   const [isLoading, setIsLoading] = useState(false);
@@ -225,6 +243,14 @@ const EditShipmentModal = ({
         imo: shipment.imo || "",
         actualDeparture: shipment.actualDeparture || "",
         reportedEta: shipment.reportedEta || "",
+        navio: shipment.navio || "",
+        containerType: shipment.containerType || "40HC",
+        cargoReady: shipment.cargoReady || "",
+        coleta: shipment.coleta || "",
+        emptyToShipper: shipment.emptyToShipper || "",
+        readyToLoad: shipment.readyToLoad || "",
+        loadedOnBoard: shipment.loadedOnBoard || "",
+        destinoRumo: shipment.destinoRumo || "",
       };
       console.log("FormData configurado:", newFormData);
       setFormData(newFormData);
@@ -326,6 +352,15 @@ const EditShipmentModal = ({
       return;
     }
 
+    const statusCheck = isValidStatusTransition(
+      shipment.status || "",
+      formData.status
+    );
+    if (!statusCheck.valid) {
+      alert(statusCheck.reason || "Transição de status inválida.");
+      return;
+    }
+
     setIsLoading(true);
 
     try {
@@ -351,6 +386,14 @@ const EditShipmentModal = ({
         imo: formData.imo,
         actualDeparture: formData.actualDeparture,
         reportedEta: formData.reportedEta,
+        navio: formData.navio,
+        containerType: formData.containerType,
+        cargoReady: formData.cargoReady,
+        coleta: formData.coleta,
+        emptyToShipper: formData.emptyToShipper,
+        readyToLoad: formData.readyToLoad,
+        loadedOnBoard: formData.loadedOnBoard,
+        destinoRumo: formData.destinoRumo,
         companyId: selectedCliente?.companyId ?? shipment.companyId,
         updatedAt: new Date(),
       };
@@ -734,6 +777,117 @@ const EditShipmentModal = ({
                   {errors.armador && (
                     <span className="error-message">{errors.armador}</span>
                   )}
+                </div>
+              </div>
+            </div>
+
+            {/* Datas operacionais — modelo JABIL */}
+            <div className="form-section">
+              <div className="section-title">
+                <Ship size={18} />
+                <span>Datas operacionais</span>
+              </div>
+              <div className="form-row">
+                <div className="form-group">
+                  <label htmlFor="navio">Navio</label>
+                  <input
+                    type="text"
+                    id="navio"
+                    name="navio"
+                    value={formData.navio}
+                    onChange={handleInputChange}
+                    disabled={!canEdit}
+                    placeholder="Ex: CMA CGM VELA"
+                  />
+                </div>
+                <div className="form-group">
+                  <label htmlFor="containerType">Tipo de contêiner</label>
+                  <select
+                    id="containerType"
+                    name="containerType"
+                    value={formData.containerType}
+                    onChange={handleInputChange}
+                    disabled={!canEdit}
+                  >
+                    {CONTAINER_TYPES.map((t) => (
+                      <option key={t} value={t}>
+                        {t}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+              </div>
+              <div className="form-row">
+                <div className="form-group">
+                  <label htmlFor="cargoReady">Carga pronta (Cargo Ready)</label>
+                  <input
+                    type="date"
+                    id="cargoReady"
+                    name="cargoReady"
+                    value={formData.cargoReady}
+                    onChange={handleInputChange}
+                    disabled={!canEdit}
+                  />
+                </div>
+                <div className="form-group">
+                  <label htmlFor="coleta">Coleta</label>
+                  <input
+                    type="date"
+                    id="coleta"
+                    name="coleta"
+                    value={formData.coleta}
+                    onChange={handleInputChange}
+                    disabled={!canEdit}
+                  />
+                </div>
+              </div>
+              <div className="form-row">
+                <div className="form-group">
+                  <label htmlFor="emptyToShipper">Empty to Shipper</label>
+                  <input
+                    type="date"
+                    id="emptyToShipper"
+                    name="emptyToShipper"
+                    value={formData.emptyToShipper}
+                    onChange={handleInputChange}
+                    disabled={!canEdit}
+                  />
+                </div>
+                <div className="form-group">
+                  <label htmlFor="readyToLoad">Ready to Load</label>
+                  <input
+                    type="datetime-local"
+                    id="readyToLoad"
+                    name="readyToLoad"
+                    value={formData.readyToLoad}
+                    onChange={handleInputChange}
+                    disabled={!canEdit}
+                  />
+                </div>
+              </div>
+              <div className="form-row">
+                <div className="form-group">
+                  <label htmlFor="loadedOnBoard">Loaded on Board</label>
+                  <input
+                    type="date"
+                    id="loadedOnBoard"
+                    name="loadedOnBoard"
+                    value={formData.loadedOnBoard}
+                    onChange={handleInputChange}
+                    disabled={!canEdit}
+                  />
+                </div>
+                <div className="form-group">
+                  <label htmlFor="destinoRumo">Rumo a (destino)</label>
+                  <input
+                    type="text"
+                    id="destinoRumo"
+                    name="destinoRumo"
+                    value={formData.destinoRumo}
+                    onChange={handleInputChange}
+                    disabled={!canEdit}
+                    placeholder="Ex: Qingdao"
+                  />
                 </div>
               </div>
             </div>

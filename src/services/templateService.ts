@@ -2,6 +2,12 @@ import { doc, getDoc, setDoc } from "firebase/firestore";
 import type { Shipment } from "../context/shipments-context";
 import { getStatusLabel } from "../constants/statusOptions";
 import { db } from "../lib/firebaseConfig";
+import {
+  formatContainerSpec,
+  formatDatePt,
+  formatDateTimePt,
+  formatLocationWithRoute,
+} from "../utils/shipmentFormatters";
 import type {
   NotificationTemplate,
   NotificationTemplateId,
@@ -111,6 +117,45 @@ _Sea Logistics International_`,
 
 _Sea Logistics International_`,
   },
+  jabil_shipment_email: {
+    id: "jabil_shipment_email",
+    name: "Embarque Internacional (JABIL)",
+    subject: "Embarque internacional — Booking {{booking}}",
+    body: `<p>Prezado(a) Cliente <strong>{{cliente}}</strong>,</p>
+<p>Segue as informações referentes ao seu embarque internacional.</p>
+<h3>📦 Detalhes do Embarque</h3>
+<ul>
+  <li><strong>Booking:</strong> {{booking}}</li>
+  <li><strong>Navio:</strong> {{navio}}</li>
+  <li><strong>Contêineres:</strong> {{containerSpec}}</li>
+  <li><strong>Carga Pronta:</strong> {{cargoReady}}</li>
+  <li><strong>Coleta:</strong> {{coleta}}</li>
+  <li><strong>Empty to Shipper:</strong> {{emptyToShipper}}</li>
+  <li><strong>Ready to Load:</strong> {{readyToLoad}}</li>
+  <li><strong>Loaded on Board:</strong> {{loadedOnBoard}}</li>
+  <li><strong>ETD:</strong> {{etdOrigem}}</li>
+  <li><strong>ETA:</strong> {{etaDestino}}</li>
+  <li><strong>Localização:</strong> {{localizacaoCompleta}}</li>
+  <li><strong>Status:</strong> {{status}}</li>
+</ul>
+<p>Atenciosamente,<br>Sea Logistics International</p>`,
+  },
+  jabil_shipment_whatsapp: {
+    id: "jabil_shipment_whatsapp",
+    name: "Embarque Internacional WhatsApp (JABIL)",
+    body: `🚢 *Embarque Internacional*
+
+Prezado(a) *{{cliente}}*,
+
+• Booking: {{booking}}
+• Navio: {{navio}}
+• Contêineres: {{containerSpec}}
+• ETD: {{etdOrigem}} | ETA: {{etaDestino}}
+• Local: {{localizacaoCompleta}}
+• Status: {{status}}
+
+_Sea Logistics_`,
+  },
 };
 
 function formatDate(dateString?: string): string {
@@ -140,6 +185,18 @@ export function buildTemplateVariables(
     booking: shipment.booking || "-",
     currentLocation: shipment.currentLocation || "-",
     quantBox: String(shipment.quantBox ?? 0),
+    navio: shipment.navio || shipment.armador || "-",
+    containerSpec: formatContainerSpec(
+      shipment.quantBox,
+      shipment.containerType
+    ),
+    cargoReady: formatDatePt(shipment.cargoReady),
+    coleta: formatDatePt(shipment.coleta),
+    emptyToShipper: formatDatePt(shipment.emptyToShipper),
+    readyToLoad: formatDateTimePt(shipment.readyToLoad),
+    loadedOnBoard: formatDatePt(shipment.loadedOnBoard),
+    destinoRumo: shipment.destinoRumo || shipment.pod || "-",
+    localizacaoCompleta: formatLocationWithRoute(shipment),
   };
 }
 
@@ -195,7 +252,7 @@ export function getAllDefaultTemplates(): NotificationTemplate[] {
 }
 
 export async function renderEmailTemplate(
-  id: "new_shipment_email" | "status_update_email",
+  id: "new_shipment_email" | "status_update_email" | "jabil_shipment_email",
   shipment: Shipment,
   extra?: { oldStatus?: string }
 ): Promise<{ subject: string; html: string }> {
@@ -208,7 +265,11 @@ export async function renderEmailTemplate(
 }
 
 export async function renderWhatsAppTemplate(
-  id: "new_shipment_whatsapp" | "status_update_whatsapp" | "tracking_whatsapp",
+  id:
+    | "new_shipment_whatsapp"
+    | "status_update_whatsapp"
+    | "tracking_whatsapp"
+    | "jabil_shipment_whatsapp",
   shipment: Shipment,
   extra?: { oldStatus?: string }
 ): Promise<string> {

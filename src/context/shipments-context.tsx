@@ -54,6 +54,17 @@ export interface Shipment {
   imo?: string;
   actualDeparture?: string;
   reportedEta?: string;
+  /** Nome/código do navio (ex: CMA CGM VELA) */
+  navio?: string;
+  /** Tipo de container (20GP, 40HC, etc.) */
+  containerType?: string;
+  cargoReady?: string;
+  coleta?: string;
+  emptyToShipper?: string;
+  readyToLoad?: string;
+  loadedOnBoard?: string;
+  /** Porto/cidade rumo a (complemento de localização) */
+  destinoRumo?: string;
   createdAt?: Timestamp | Date;
   updatedAt?: Timestamp | Date;
 }

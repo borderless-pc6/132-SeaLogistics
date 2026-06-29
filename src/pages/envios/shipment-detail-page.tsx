@@ -1,8 +1,9 @@
 "use client";
 
-import { ArrowLeft, Edit, MapPin, Package, Ship } from "lucide-react";
+import { ArrowLeft, Edit, Mail, MapPin, Package, Ship } from "lucide-react";
 import { useEffect, useState } from "react";
 import { Link, useNavigate, useParams } from "react-router-dom";
+import { EmailPreviewModal } from "../../components/email-preview-modal/email-preview-modal";
 import Navbar from "../../components/navbar/navbar";
 import EditShipmentModal from "../../components/edit-shipment-modal/edit-shipment-modal";
 import { ShipmentTimeline } from "../../components/shipment-timeline/shipment-timeline";
@@ -11,6 +12,10 @@ import { getStatusLabel } from "../../constants/statusOptions";
 import { useAuth } from "../../context/auth-context";
 import { useLanguage } from "../../context/language-context";
 import { type Shipment, useShipments } from "../../context/shipments-context";
+import {
+  formatContainerSpec,
+  formatLocationWithRoute,
+} from "../../utils/shipmentFormatters";
 import "./shipment-detail-page.css";
 
 export function ShipmentDetailPage() {
@@ -21,6 +26,7 @@ export function ShipmentDetailPage() {
   const { shipments, updateShipment, loading } = useShipments();
   const [shipment, setShipment] = useState<Shipment | null>(null);
   const [showEditModal, setShowEditModal] = useState(false);
+  const [showEmailPreview, setShowEmailPreview] = useState(false);
 
   useEffect(() => {
     if (!id) return;
@@ -100,13 +106,22 @@ export function ShipmentDetailPage() {
           </div>
 
           {isStaff() && (
-            <button
-              type="button"
-              className="edit-btn"
-              onClick={() => setShowEditModal(true)}
-            >
-              <Edit size={16} /> Editar
-            </button>
+            <div className="shipment-detail-actions">
+              <button
+                type="button"
+                className="edit-btn"
+                onClick={() => setShowEditModal(true)}
+              >
+                <Edit size={16} /> Editar
+              </button>
+              <button
+                type="button"
+                className="preview-email-btn"
+                onClick={() => setShowEmailPreview(true)}
+              >
+                <Mail size={16} /> Preview e-mail JABIL
+              </button>
+            </div>
           )}
         </div>
 
@@ -129,7 +144,15 @@ export function ShipmentDetailPage() {
               <dt>Invoice</dt>
               <dd>{shipment.invoice || "—"}</dd>
               <dt>Containers</dt>
-              <dd>{shipment.quantBox ?? "—"}</dd>
+              <dd>
+                {formatContainerSpec(shipment.quantBox, shipment.containerType)}
+              </dd>
+              {shipment.navio && (
+                <>
+                  <dt>Navio</dt>
+                  <dd>{shipment.navio}</dd>
+                </>
+              )}
               {shipment.imo && (
                 <>
                   <dt>IMO</dt>
@@ -157,7 +180,25 @@ export function ShipmentDetailPage() {
               <dt>ETA reportado</dt>
               <dd>{formatDate(shipment.reportedEta)}</dd>
               <dt>Localização atual</dt>
-              <dd>{shipment.currentLocation || "—"}</dd>
+              <dd>{formatLocationWithRoute(shipment)}</dd>
+            </dl>
+          </section>
+
+          <section className="detail-card">
+            <h2>
+              <Ship size={20} /> Datas operacionais
+            </h2>
+            <dl>
+              <dt>Carga pronta</dt>
+              <dd>{formatDate(shipment.cargoReady)}</dd>
+              <dt>Coleta</dt>
+              <dd>{formatDate(shipment.coleta)}</dd>
+              <dt>Empty to Shipper</dt>
+              <dd>{formatDate(shipment.emptyToShipper)}</dd>
+              <dt>Ready to Load</dt>
+              <dd>{formatDate(shipment.readyToLoad)}</dd>
+              <dt>Loaded on Board</dt>
+              <dd>{formatDate(shipment.loadedOnBoard)}</dd>
             </dl>
           </section>
 
@@ -177,6 +218,13 @@ export function ShipmentDetailPage() {
           <Link to="/envios">{translations.shipments || "Ver todos os envios"}</Link>
         </p>
       </div>
+
+      {showEmailPreview && (
+        <EmailPreviewModal
+          shipment={shipment}
+          onClose={() => setShowEmailPreview(false)}
+        />
+      )}
 
       {showEditModal && (
         <EditShipmentModal

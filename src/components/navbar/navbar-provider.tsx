@@ -1,4 +1,4 @@
-import React, { useState, ReactNode } from 'react';
+import React, { useEffect, useState, ReactNode } from 'react';
 import { NavbarContext } from './navbar-context';
 
 interface NavbarProviderProps {
@@ -7,6 +7,10 @@ interface NavbarProviderProps {
 
 export const NavbarProvider: React.FC<NavbarProviderProps> = ({ children }) => {
     const [isCollapsed, setIsCollapsed] = useState(false);
+
+    useEffect(() => {
+        document.documentElement.dataset.navbarCollapsed = isCollapsed ? 'true' : 'false';
+    }, [isCollapsed]);
 
     return (
         <NavbarContext.Provider value={{ isCollapsed, setIsCollapsed }}>

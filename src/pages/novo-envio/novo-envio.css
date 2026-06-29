@@ -7,7 +7,7 @@
 
 .novo-envio-content {
   flex: 1;
-  margin-left: 280px;
+  margin-left: var(--page-content-offset);
   padding: 2rem;
   transition: margin-left 0.3s ease;
   padding-bottom: 100px; /* Espaço para o footer */
@@ -186,15 +186,8 @@
 }
 
 /* Responsividade */
-@media (max-width: 1024px) {
-  .novo-envio-content {
-    margin-left: 80px;
-  }
-}
-
 @media (max-width: 768px) {
   .novo-envio-content {
-    margin-left: 0;
     padding: 1rem;
   }
 
