@@ -24,10 +24,9 @@ import {
 } from "react";
 import { db } from "../lib/firebaseConfig";
 import {
-  sendEmail,
-  sendMaritimeShipmentUpdateEmail,
-} from "../services/emailService";
-import { sendStatusUpdateNotification } from "../services/notificationService";
+  sendClientShipmentNotification,
+  sendClientStatusUpdateNotification,
+} from "../services/notificationService";
 import { recordStatusHistory } from "../services/statusHistoryService";
 import { UserRole } from "../types/user";
 import { useAuth } from "./auth-context";
@@ -150,6 +149,11 @@ export const ShipmentsProvider: React.FC<ShipmentsProviderProps> = ({
       },
       (error) => {
         console.error("Error fetching shipments:", error);
+        if (error.code === "permission-denied") {
+          console.error(
+            "Permissão negada no Firestore. Faça logout e login novamente com o backend rodando (FIREBASE_SERVICE_ACCOUNT configurado)."
+          );
+        }
         setLoading(false);
       }
     );
@@ -220,99 +224,16 @@ export const ShipmentsProvider: React.FC<ShipmentsProviderProps> = ({
         console.error("Erro ao registrar histórico de criação:", historyError);
       }
 
-      // Enviar email de notificação
+      // Notificar cliente final (email + WhatsApp da empresa)
       if (companyIdToUse) {
         try {
-          console.log("Buscando dados da empresa...");
-          const companyDoc = await getDoc(doc(db, "companies", companyIdToUse));
-          if (companyDoc.exists()) {
-            const companyData = companyDoc.data();
-            console.log("Dados da empresa:", companyData);
-
-            if (companyData.contactEmail) {
-              console.log(
-                "Preparando para enviar email para:",
-                companyData.contactEmail
-              );
-              await sendEmail({
-                to: companyData.contactEmail,
-                subject: `Novo envio criado - ${shipmentData.numeroBl}`,
-                html: `
-                                    <h2>Novo envio criado</h2>
-                                    <p>Um novo envio foi criado com os seguintes detalhes:</p>
-                                    <ul>
-                                        <li><strong>Número BL:</strong> ${
-                                          shipmentData.numeroBl
-                                        }</li>
-                                        <li><strong>Cliente:</strong> ${
-                                          shipmentData.cliente
-                                        }</li>
-                                        <li><strong>Operador:</strong> ${
-                                          shipmentData.operador
-                                        }</li>
-                                        <li><strong>Tipo de Transporte:</strong> ${
-                                          shipmentData.tipo ||
-                                          "Não especificado"
-                                        }</li>
-                                        <li><strong>${
-                                          shipmentData.tipo === "Aéreo"
-                                            ? "Aeroporto"
-                                            : shipmentData.tipo === "Terrestre"
-                                            ? "Local"
-                                            : "Porto"
-                                        } de Origem:</strong> ${
-                  shipmentData.pol
-                }</li>
-                                        <li><strong>${
-                                          shipmentData.tipo === "Aéreo"
-                                            ? "Aeroporto"
-                                            : shipmentData.tipo === "Terrestre"
-                                            ? "Local"
-                                            : "Porto"
-                                        } de Destino:</strong> ${
-                  shipmentData.pod
-                }</li>
-                                        <li><strong>ETD Origem:</strong> ${
-                                          shipmentData.etdOrigem
-                                        }</li>
-                                        <li><strong>ETA Destino:</strong> ${
-                                          shipmentData.etaDestino
-                                        }</li>
-                                        <li><strong>Localização Atual:</strong> ${
-                                          shipmentData.currentLocation
-                                        }</li>
-                                        <li><strong>Quantidade de Containers:</strong> ${
-                                          shipmentData.quantBox
-                                        }</li>
-                                        <li><strong>Status:</strong> ${
-                                          shipmentData.status
-                                        }</li>
-                                        <li><strong>Armador:</strong> ${
-                                          shipmentData.armador
-                                        }</li>
-                                        <li><strong>Booking:</strong> ${
-                                          shipmentData.booking
-                                        }</li>
-                                        <li><strong>Invoice:</strong> ${
-                                          shipmentData.invoice
-                                        }</li>
-                                        ${
-                                          shipmentData.observacoes
-                                            ? `<li><strong>Observações:</strong> ${shipmentData.observacoes}</li>`
-                                            : ""
-                                        }
-                                    </ul>
-                                `,
-              });
-            } else {
-              console.log("Empresa não tem email de contato cadastrado");
-            }
-          } else {
-            console.log("Empresa não encontrada no Firestore");
-          }
+          await sendClientShipmentNotification({
+            ...shipmentData,
+            id: docRef.id,
+            companyId: companyIdToUse,
+          } as Shipment);
         } catch (error) {
-          console.error("=== ERRO AO ENVIAR EMAIL DE NOTIFICAÇÃO ===");
-          console.error("Detalhes do erro:", error);
+          console.error("=== ERRO AO NOTIFICAR CLIENTE (NOVO ENVIO) ===", error);
         }
       }
     } catch (error) {
@@ -395,154 +316,18 @@ export const ShipmentsProvider: React.FC<ShipmentsProviderProps> = ({
         }
       }
 
-      // Enviar notificações se o status mudou
+      // Notificar cliente final quando o status mudar
       if (oldStatus !== updatedShipment.status) {
-        // 1) Notificação por email para a empresa (mantém comportamento atual)
-        if (updatedShipment.companyId) {
-          try {
-            console.log("Status alterado, buscando dados da empresa...");
-            console.log("Company ID para busca:", updatedShipment.companyId);
-
-            const companyDoc = await getDoc(
-              doc(db, "companies", updatedShipment.companyId)
-            );
-            console.log("Documento da empresa encontrado:", companyDoc.exists());
-
-            if (companyDoc.exists()) {
-              const companyData = companyDoc.data();
-              console.log("Dados da empresa:", companyData);
-
-              // Destinatário: contactEmail da empresa ou, se vazio, email do primeiro usuário da empresa
-              let emailTo = (companyData.contactEmail || "").trim();
-              if (!emailTo) {
-                try {
-                  const usersSnap = await getDocs(
-                    query(
-                      collection(db, "users"),
-                      where("companyId", "==", updatedShipment.companyId)
-                    )
-                  );
-                  const firstUser = usersSnap.docs.find(
-                    (d) => d.data().email
-                  );
-                  if (firstUser?.data()?.email) {
-                    emailTo = firstUser.data().email.trim();
-                    console.log(
-                      "Empresa sem contactEmail; usando email do usuário:",
-                      emailTo
-                    );
-                  }
-                } catch (e) {
-                  console.warn("Erro ao buscar usuário da empresa:", e);
-                }
-              }
-
-              if (emailTo) {
-                console.log(
-                  "Preparando para enviar email de atualização de status para:",
-                  emailTo
-                );
-                // Usar o novo template de email para embarques marítimos
-                if (updatedShipment.tipo === "Marítimo") {
-                  await sendMaritimeShipmentUpdateEmail(
-                    emailTo,
-                    companyData.name || "Cliente",
-                    {
-                      vessel: updatedShipment.armador,
-                      originPort: updatedShipment.pol,
-                      destinationPort: updatedShipment.pod,
-                      booking: updatedShipment.booking,
-                      blNumber: updatedShipment.numeroBl,
-                      etd: updatedShipment.etdOrigem,
-                      eta: updatedShipment.etaDestino,
-                      currentLocation: updatedShipment.currentLocation,
-                      status: updatedShipment.status,
-                      imo: updatedShipment.imo || "9735206",
-                      actualDeparture:
-                        updatedShipment.actualDeparture ||
-                        `${updatedShipment.etdOrigem} 21:19 (UTC-5)`,
-                      reportedEta:
-                        updatedShipment.reportedEta ||
-                        `${updatedShipment.etaDestino} 12:00 (UTC-3)`,
-                    }
-                  );
-                } else {
-                  // Email padrão para outros tipos de transporte
-                  await sendEmail({
-                    to: emailTo,
-                    subject: `Status do envio atualizado - ${updatedShipment.numeroBl}`,
-                    html: `
-                                    <h2>Status do envio atualizado</h2>
-                                    <p>O status do seu envio foi atualizado:</p>
-                                    <ul>
-                                        <li><strong>Número BL:</strong> ${
-                                          updatedShipment.numeroBl
-                                        }</li>
-                                        <li><strong>Status Anterior:</strong> ${oldStatus}</li>
-                                        <li><strong>Novo Status:</strong> ${
-                                          updatedShipment.status
-                                        }</li>
-                                        <li><strong>Cliente:</strong> ${
-                                          updatedShipment.cliente
-                                        }</li>
-                                        <li><strong>Tipo de Transporte:</strong> ${
-                                          updatedShipment.tipo ||
-                                          "Não especificado"
-                                        }</li>
-                                        <li><strong>Porto de Origem:</strong> ${
-                                          updatedShipment.pol
-                                        }</li>
-                                        <li><strong>Porto de Destino:</strong> ${
-                                          updatedShipment.pod
-                                        }</li>
-                                        <li><strong>Localização Atual:</strong> ${
-                                          updatedShipment.currentLocation
-                                        }</li>
-                                        <li><strong>Observações:</strong> ${
-                                          updatedShipment.observacoes
-                                        }</li>
-                                    </ul>
-                                `,
-                  });
-                }
-              } else {
-                console.log(
-                  "Nenhum email para notificação: empresa sem contactEmail e sem usuário com email para companyId:",
-                  updatedShipment.companyId
-                );
-              }
-            } else {
-              console.log("Empresa não encontrada no Firestore");
-            }
-          } catch (error) {
-            console.error("=== ERRO AO ENVIAR EMAIL DE NOTIFICAÇÃO ===");
-            console.error("Detalhes do erro:", error);
-          }
-        }
-
-        // 2) Notificação automática (email/WhatsApp) para o usuário/cliente, respeitando preferências
-        if (currentUser) {
-          try {
-            await sendStatusUpdateNotification(
-              updatedShipment,
-              currentUser.uid,
-              oldStatus,
-              currentUser.email || undefined
-            );
-          } catch (error) {
-            console.error(
-              "=== ERRO AO ENVIAR NOTIFICAÇÃO DE STATUS (USUÁRIO) ==="
-            );
-            console.error("Detalhes do erro:", error);
-          }
+        try {
+          await sendClientStatusUpdateNotification(updatedShipment, oldStatus);
+        } catch (error) {
+          console.error(
+            "=== ERRO AO NOTIFICAR CLIENTE (ATUALIZAÇÃO DE STATUS) ===",
+            error
+          );
         }
       } else {
         console.log("Status não foi alterado");
-        console.log(
-          "oldStatus === updatedShipment.status:",
-          oldStatus === updatedShipment.status
-        );
-        console.log("updatedShipment.companyId:", updatedShipment.companyId);
       }
 
       console.log("Shipment updated successfully:", updatedShipment.id);

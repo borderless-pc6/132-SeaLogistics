@@ -14,6 +14,34 @@ export interface LoginResponse {
   error?: string;
 }
 
+export interface RegisterAdminResponse {
+  success: boolean;
+  user?: User & { uid: string };
+  error?: string;
+}
+
+/** @deprecated Auth usa Firestore diretamente — ver authService.ts e auth-context */
+export async function registerAdminWithApi(data: {
+  name: string;
+  email: string;
+  password: string;
+  adminCode: string;
+}): Promise<RegisterAdminResponse> {
+  const response = await fetch(`${API_URL}/api/auth/register-admin`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(data),
+  });
+
+  const result = (await response.json()) as RegisterAdminResponse;
+
+  if (!response.ok) {
+    throw new Error(result.error || "Erro ao cadastrar administrador");
+  }
+
+  return result;
+}
+
 export async function loginWithApi(
   email: string,
   password: string
@@ -43,6 +71,36 @@ export function getAuthToken(): string | null {
 
 export function clearAuthToken() {
   localStorage.removeItem("authToken");
+}
+
+export interface RefreshFirebaseResponse {
+  success: boolean;
+  firebaseCustomToken?: string;
+  error?: string;
+}
+
+/** Renova a sessão Firebase Auth a partir do JWT armazenado (necessário para regras do Firestore). */
+export async function refreshFirebaseSession(): Promise<RefreshFirebaseResponse> {
+  const token = getAuthToken();
+  if (!token) {
+    return { success: false, error: "Token JWT não encontrado" };
+  }
+
+  const response = await fetch(`${API_URL}/api/auth/refresh-firebase`, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      Authorization: `Bearer ${token}`,
+    },
+  });
+
+  const data = (await response.json()) as RefreshFirebaseResponse;
+
+  if (!response.ok) {
+    throw new Error(data.error || "Erro ao renovar sessão Firebase");
+  }
+
+  return data;
 }
 
 export async function apiFetch(

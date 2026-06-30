@@ -1,10 +1,14 @@
-import { apiFetch } from "./authApi";
+/**
+ * @deprecated Embarques são gerenciados via Firestore (`shipments-context`).
+ * Mantido apenas como referência — não é importado em nenhum lugar do app.
+ */
 import type { Shipment } from "../context/shipments-context";
+import { apiFetch } from "./authApi";
 
 export async function fetchShipmentsApi(): Promise<Shipment[]> {
   const response = await apiFetch("/api/shipments");
   const data = await response.json();
-  if (!response.ok) throw new Error(data.error || "Erro ao buscar embarques");
+  if (!response.ok) throw new Error(data.error || "Erro ao listar embarques");
   return data.shipments;
 }
 
@@ -20,6 +24,7 @@ export async function createShipmentApi(
 ): Promise<Shipment> {
   const response = await apiFetch("/api/shipments", {
     method: "POST",
+    headers: { "Content-Type": "application/json" },
     body: JSON.stringify(shipment),
   });
   const data = await response.json();
@@ -29,11 +34,12 @@ export async function createShipmentApi(
 
 export async function updateShipmentApi(
   id: string,
-  updates: Partial<Shipment>
+  shipment: Partial<Shipment>
 ): Promise<Shipment> {
   const response = await apiFetch(`/api/shipments/${id}`, {
     method: "PUT",
-    body: JSON.stringify(updates),
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(shipment),
   });
   const data = await response.json();
   if (!response.ok) throw new Error(data.error || "Erro ao atualizar embarque");
@@ -43,11 +49,12 @@ export async function updateShipmentApi(
 export async function updateShipmentStatusApi(
   id: string,
   status: string,
-  extras?: { currentLocation?: string; reportedEta?: string }
+  extra?: { currentLocation?: string; reportedEta?: string }
 ): Promise<Shipment> {
   const response = await apiFetch(`/api/shipments/${id}/status`, {
     method: "PATCH",
-    body: JSON.stringify({ status, ...extras }),
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ status, ...extra }),
   });
   const data = await response.json();
   if (!response.ok) throw new Error(data.error || "Erro ao atualizar status");

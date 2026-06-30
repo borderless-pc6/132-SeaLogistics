@@ -15,9 +15,15 @@ import { useNavigate } from "react-router-dom";
 import { useFormValidation } from "../../hooks/useFormValidation";
 import { useLanguage } from "../../context/language-context";
 import { useToast } from "../../context/toast-context";
+import { useAuth } from "../../context/auth-context";
 import { db } from "../../lib/firebaseConfig";
+import { registerUserInFirestore } from "../../services/authService";
 import { createRegisterSchema } from "../../schemas/registerSchema";
 import { type userCredentials, UserRole } from "../../types/user";
+import {
+  isAdminRegistrationConfigured,
+  validateAdminCode,
+} from "../../utils/adminCode";
 import { hashPassword } from "../../utils/passwordUtils";
 import { PasswordStrengthIndicator } from "../password-strength-indicator";
 import LanguageSwitcher from "../language-switcher/language-switcher";
@@ -35,9 +41,11 @@ export default function RegisterSplit() {
     role: UserRole.COMPANY_USER,
   });
   const [isCreatingAdmin, setIsCreatingAdmin] = useState(false);
+  const [adminCode, setAdminCode] = useState("");
 
   const { translations } = useLanguage();
   const { showError, showSuccess } = useToast();
+  const { login } = useAuth();
   const navigate = useNavigate();
   
   const registerSchema = useMemo(
@@ -102,7 +110,37 @@ export default function RegisterSplit() {
       return;
     }
 
+    if (isCreatingAdmin && !adminCode.trim()) {
+      showError(translations.adminCodeRequired);
+      return;
+    }
+
+    if (isCreatingAdmin && !isAdminRegistrationConfigured()) {
+      showError(translations.adminCodeNotConfigured);
+      return;
+    }
+
     try {
+      if (isCreatingAdmin && role === UserRole.ADMIN) {
+        if (!validateAdminCode(adminCode.trim())) {
+          showError(translations.invalidAdminCode);
+          return;
+        }
+
+        await registerUserInFirestore({
+          name: name ?? "",
+          email,
+          password,
+          role: UserRole.ADMIN,
+        });
+
+        await login(email, password);
+        showSuccess(translations.accountCreatedSuccess);
+        clearAllErrors();
+        navigate("/home");
+        return;
+      }
+
       // Gerar ID único simples para demonstração
       const userId = `user_${Date.now()}`;
       let companyId: string | undefined;
@@ -139,24 +177,15 @@ export default function RegisterSplit() {
       // Salvar dados do usuário no Firestore
       await setDoc(doc(db, "users", userId), userData);
 
-      // Salvar dados do usuário logado no localStorage
-      localStorage.setItem(
-        "currentUser",
-        JSON.stringify({
-          email,
-          name: name ?? translations.user,
-          id: userId,
-          role,
-        })
-      );
-
-      console.log("Usuário cadastrado com sucesso");
+      await login(email, password);
       showSuccess(translations.accountCreatedSuccess);
       clearAllErrors();
       navigate("/home");
     } catch (err) {
       console.error("Erro ao cadastrar:", err);
-      showError(translations.registrationError);
+      const message =
+        err instanceof Error ? err.message : translations.registrationError;
+      showError(message);
     }
   };
 
@@ -195,6 +224,7 @@ export default function RegisterSplit() {
                 checked={!isCreatingAdmin}
                 onChange={() => {
                   setIsCreatingAdmin(false);
+                  setAdminCode("");
                   setUserCredentials({
                     ...userCredentials,
                     role: UserRole.COMPANY_USER,
@@ -306,6 +336,22 @@ export default function RegisterSplit() {
                 )}
               </div>
             </>
+          )}
+
+          {isCreatingAdmin && (
+            <div className="split-form-group">
+              <label htmlFor="adminCode">{translations.adminCode}</label>
+              <input
+                id="adminCode"
+                type="password"
+                value={adminCode}
+                onChange={(e) => setAdminCode(e.target.value)}
+                placeholder={translations.adminCodePlaceholder}
+                autoComplete="off"
+                required
+              />
+              <small>{translations.adminCodeHint}</small>
+            </div>
           )}
 
           <div className="split-password-grid">

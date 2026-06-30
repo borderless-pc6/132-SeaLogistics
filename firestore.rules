@@ -8,16 +8,20 @@ service cloud.firestore {
     
     // Função para verificar se o usuário é admin
     function isAdmin() {
-      return isAuthenticated() && 
-             exists(/databases/$(database)/documents/users/$(request.auth.uid)) &&
-             get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'admin';
+      return isAuthenticated() && (
+        request.auth.token.role == 'admin' ||
+        (exists(/databases/$(database)/documents/users/$(request.auth.uid)) &&
+         get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'admin')
+      );
     }
     
     // Função para verificar se o usuário é operador
     function isOperator() {
-      return isAuthenticated() && 
-             exists(/databases/$(database)/documents/users/$(request.auth.uid)) &&
-             get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'operator';
+      return isAuthenticated() && (
+        request.auth.token.role == 'operator' ||
+        (exists(/databases/$(database)/documents/users/$(request.auth.uid)) &&
+         get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'operator')
+      );
     }
 
     function isStaff() {
@@ -26,30 +30,30 @@ service cloud.firestore {
     
     // Função para verificar se o usuário é da mesma empresa
     function isSameCompany(companyId) {
-      return isAuthenticated() && 
-             exists(/databases/$(database)/documents/users/$(request.auth.uid)) &&
-             get(/databases/$(database)/documents/users/$(request.auth.uid)).data.companyId == companyId;
+      return isAuthenticated() && (
+        request.auth.token.companyId == companyId ||
+        (exists(/databases/$(database)/documents/users/$(request.auth.uid)) &&
+         get(/databases/$(database)/documents/users/$(request.auth.uid)).data.companyId == companyId)
+      );
     }
     
     // Regras para a coleção de usuários
     match /users/{userId} {
-      // Admins podem ler/escrever qualquer usuário
-      allow read, write: if isAdmin();
-      
-      // Usuários podem ler/escrever apenas seus próprios dados
-      allow read, write: if isAuthenticated() && request.auth.uid == userId;
+      // Autenticação customizada (email/senha no Firestore, sessão via localStorage)
+      allow read: if true;
+      allow create: if request.resource.data.role == 'company_user' ||
+                    request.resource.data.role == 'admin';
+      allow update: if true;
+      allow delete: if isAdmin();
     }
     
     // Regras para a coleção de empresas
     match /companies/{companyId} {
-      // Admins podem ler/escrever qualquer empresa
-      allow read, write: if isAdmin();
-      
-      // Usuários de empresa podem ler apenas sua própria empresa
-      allow read: if isSameCompany(companyId);
-      
-      // Apenas admins podem criar novas empresas
-      allow create: if isAdmin();
+      allow read: if true;
+      allow create: if request.resource.data.name is string &&
+                    request.resource.data.code is string &&
+                    request.resource.data.contactEmail is string;
+      allow update, delete: if isAdmin();
     }
     
     // Regras para a coleção de shipments
@@ -59,8 +63,7 @@ service cloud.firestore {
       
       // Usuários de empresa podem apenas ler e atualizar shipments da sua empresa
       allow read, update: if isAuthenticated() && 
-                           exists(/databases/$(database)/documents/users/$(request.auth.uid)) &&
-                           resource.data.companyId == get(/databases/$(database)/documents/users/$(request.auth.uid)).data.companyId;
+                           isSameCompany(resource.data.companyId);
       
       // Staff pode criar novos shipments
       allow create: if isStaff();
@@ -69,14 +72,11 @@ service cloud.firestore {
     // Regras para histórico de status dos embarques
     match /statusHistory/{historyId} {
       allow read: if isStaff() ||
-        (isAuthenticated() &&
-         exists(/databases/$(database)/documents/users/$(request.auth.uid)) &&
-         resource.data.companyId == get(/databases/$(database)/documents/users/$(request.auth.uid)).data.companyId);
+        (isAuthenticated() && isSameCompany(resource.data.companyId));
 
       allow create: if isStaff() ||
         (isAuthenticated() &&
-         exists(/databases/$(database)/documents/users/$(request.auth.uid)) &&
-         request.resource.data.companyId == get(/databases/$(database)/documents/users/$(request.auth.uid)).data.companyId);
+         isSameCompany(request.resource.data.companyId));
 
       allow update, delete: if isAdmin();
     }

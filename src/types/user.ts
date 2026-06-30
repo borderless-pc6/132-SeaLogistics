@@ -25,9 +25,11 @@ export interface Company {
   code: string;
   contactEmail: string;
   phone?: string;
+  whatsappPhone?: string;
   address?: string;
   createdAt: Date;
   isActive: boolean;
+  notificationPreferences?: NotificationPreferences;
 }
 
 export interface User {

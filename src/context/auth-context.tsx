@@ -21,12 +21,7 @@ import React, {
   useState,
 } from "react";
 import { auth, db } from "../lib/firebaseConfig";
-import {
-  clearAuthToken,
-  getAuthToken,
-  loginWithApi,
-  storeAuthToken,
-} from "../services/authApi";
+import { clearAuthToken, getAuthToken, loginWithApi, refreshFirebaseSession, storeAuthToken } from "../services/authApi";
 import { Company, User, UserRole } from "../types/user";
 import {
   isRetryableAuthError,
@@ -72,6 +67,27 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
   const lastTokenCheckRef = useRef<number>(0);
   const tokenCheckIntervalRef = useRef<NodeJS.Timeout | null>(null);
 
+  const establishFirebaseSession = async (firebaseCustomToken: string) => {
+    await signInWithCustomToken(auth, firebaseCustomToken);
+  };
+
+  const tryRestoreFirebaseSession = async (): Promise<boolean> => {
+    const savedToken = getAuthToken();
+    if (!savedToken) return false;
+
+    try {
+      const { firebaseCustomToken } = await refreshFirebaseSession();
+      if (firebaseCustomToken) {
+        await establishFirebaseSession(firebaseCustomToken);
+        return true;
+      }
+    } catch (error) {
+      logAuthError(error, "tryRestoreFirebaseSession");
+    }
+
+    return false;
+  };
+
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, async (firebaseUser) => {
       if (firebaseUser) {
@@ -90,6 +106,10 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
         try {
           const userData = JSON.parse(savedUser);
           if (userData.id) {
+            const restored = await tryRestoreFirebaseSession();
+            if (restored) {
+              return;
+            }
             await loadUserData(userData.id);
             return;
           }
@@ -351,186 +371,162 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
     };
   }, [currentUser]);
 
-  const login = async (email: string, password: string) => {
-    try {
-      // Tenta login via API (JWT + Firebase custom token)
-      try {
-        const apiResult = await loginWithApi(email, password);
-
-        if (apiResult.success && apiResult.user && apiResult.token) {
-          storeAuthToken(apiResult.token);
-
-          if (apiResult.firebaseCustomToken) {
-            await signInWithCustomToken(auth, apiResult.firebaseCustomToken);
-          }
-
-          const finalUserData = {
-            ...apiResult.user,
-            uid: apiResult.user.uid,
-          } as User;
-
-          setCurrentUser(finalUserData);
-
-          if (
-            finalUserData.role === UserRole.COMPANY_USER &&
-            finalUserData.companyId
-          ) {
-            const companyDoc = await getDoc(
-              doc(db, "companies", finalUserData.companyId)
-            );
-            if (companyDoc.exists()) {
-              setCurrentCompany({
-                ...companyDoc.data(),
-                id: companyDoc.id,
-              } as Company);
-            }
-          }
-
-          localStorage.setItem(
-            "currentUser",
-            JSON.stringify({
-              email: finalUserData.email,
-              name: finalUserData.displayName,
-              id: finalUserData.uid,
-              role: finalUserData.role,
-            })
-          );
-          return;
-        }
-      } catch (apiError) {
-        const message =
-          apiError instanceof Error ? apiError.message : String(apiError);
-        if (
-          !message.includes("não configurado") &&
-          !message.includes("Failed to fetch") &&
-          !message.includes("NetworkError")
-        ) {
-          throw apiError;
-        }
-        console.warn(
-          "API de auth indisponível, usando fallback local:",
-          message
+  const loginViaFirestore = async (email: string, password: string) => {
+    const querySnapshot = await retryWithBackoff(
+      async () => {
+        const usersQuery = query(
+          collection(db, "users"),
+          where("email", "==", email)
         );
+        return await getDocs(usersQuery);
+      },
+      {
+        maxRetries: 3,
+        initialDelay: 1000,
+        retryable: (error) => isRetryableAuthError(error),
       }
+    );
 
-      // Fallback: autenticação direta via Firestore (legado)
-      const querySnapshot = await retryWithBackoff(
+    if (querySnapshot.empty) {
+      const error = new Error("Usuário não encontrado");
+      logAuthError(error, "login");
+      throw error;
+    }
+
+    const userDoc = querySnapshot.docs[0];
+    const userData = { ...userDoc.data(), uid: userDoc.id } as User & {
+      passwordHash?: string;
+    };
+
+    if (!userData.isActive) {
+      const error = new Error("Usuário inativo. Contacte o administrador.");
+      logAuthError(error, "login");
+      throw error;
+    }
+
+    const passwordHash = userData.passwordHash;
+    if (!passwordHash) {
+      const error = new Error(
+        "Senha não cadastrada. Por favor, redefina sua senha."
+      );
+      logAuthError(error, "login");
+      throw error;
+    }
+
+    const isPasswordValid = await verifyPassword(password, passwordHash);
+    if (!isPasswordValid) {
+      const error = new Error("Senha incorreta");
+      logAuthError(error, "login");
+      throw error;
+    }
+
+    const { passwordHash: _, ...userDataWithoutPassword } = userData;
+    const finalUserData = userDataWithoutPassword as User;
+
+    try {
+      await retryWithBackoff(
         async () => {
-          const usersQuery = query(
-            collection(db, "users"),
-            where("email", "==", email)
+          await setDoc(
+            doc(db, "users", userDoc.id),
+            {
+              ...finalUserData,
+              passwordHash,
+              lastLogin: new Date(),
+            },
+            { merge: true }
           );
-          return await getDocs(usersQuery);
         },
         {
-          maxRetries: 3,
-          initialDelay: 1000,
+          maxRetries: 2,
+          initialDelay: 500,
           retryable: (error) => isRetryableAuthError(error),
         }
       );
+    } catch (error) {
+      logAuthError(error, "login - updateLastLogin");
+    }
 
-      if (querySnapshot.empty) {
-        const error = new Error("Usuário não encontrado");
-        logAuthError(error, "login");
-        throw error;
-      }
+    setCurrentUser(finalUserData);
 
-      const userDoc = querySnapshot.docs[0];
-      const userData = { ...userDoc.data(), uid: userDoc.id } as User & { passwordHash?: string };
-
-      console.log("Usuário encontrado:", userData);
-
-      if (!userData.isActive) {
-        const error = new Error("Usuário inativo. Contacte o administrador.");
-        logAuthError(error, "login");
-        throw error;
-      }
-
-      // Verificar senha
-      const passwordHash = userData.passwordHash;
-      if (!passwordHash) {
-        // Usuário antigo sem senha cadastrada - permitir login apenas se não houver senha
-        // Mas é melhor forçar redefinição de senha
-        const error = new Error("Senha não cadastrada. Por favor, redefina sua senha.");
-        logAuthError(error, "login");
-        throw error;
-      }
-
-      const isPasswordValid = await verifyPassword(password, passwordHash);
-      if (!isPasswordValid) {
-        const error = new Error("Senha incorreta");
-        logAuthError(error, "login");
-        throw error;
-      }
-
-      // Remover passwordHash do objeto antes de salvar no estado
-      const { passwordHash: _, ...userDataWithoutPassword } = userData;
-      const finalUserData = userDataWithoutPassword as User;
-
-      // Atualizar último login com retry
+    if (userData.role === UserRole.COMPANY_USER && userData.companyId) {
       try {
-        await retryWithBackoff(
+        const companyDoc = await retryWithBackoff(
           async () => {
-            await setDoc(
-              doc(db, "users", userDoc.id),
-              {
-                ...finalUserData,
-                passwordHash, // Manter o hash no banco
-                lastLogin: new Date(),
-              },
-              { merge: true }
-            );
+            return await getDoc(doc(db, "companies", userData.companyId!));
           },
           {
             maxRetries: 2,
-            initialDelay: 500,
+            initialDelay: 1000,
             retryable: (error) => isRetryableAuthError(error),
           }
         );
-      } catch (error) {
-        // Não falha o login se não conseguir atualizar lastLogin
-        logAuthError(error, "login - updateLastLogin");
-      }
 
-      setCurrentUser(finalUserData);
-
-      // Carregar empresa se necessário
-      if (userData.role === UserRole.COMPANY_USER && userData.companyId) {
-        try {
-          const companyDoc = await retryWithBackoff(
-            async () => {
-              return await getDoc(doc(db, "companies", userData.companyId!));
-            },
-            {
-              maxRetries: 2,
-              initialDelay: 1000,
-              retryable: (error) => isRetryableAuthError(error),
-            }
-          );
-
-          if (companyDoc.exists()) {
-            const companyData = {
-              ...companyDoc.data(),
-              id: companyDoc.id,
-            } as Company;
-            setCurrentCompany(companyData);
-          }
-        } catch (error) {
-          logAuthError(error, "login - loadCompany");
-          // Não falha o login se não conseguir carregar empresa
+        if (companyDoc.exists()) {
+          const companyData = {
+            ...companyDoc.data(),
+            id: companyDoc.id,
+          } as Company;
+          setCurrentCompany(companyData);
         }
+      } catch (error) {
+        logAuthError(error, "login - loadCompany");
       }
+    }
 
-      // Salvar no localStorage
-      const userDataForStorage = {
+    localStorage.setItem(
+      "currentUser",
+      JSON.stringify({
         email: userData.email,
         name: userData.displayName,
         id: userDoc.id,
         role: userData.role,
-      };
+      })
+    );
+  };
 
-      console.log("Salvando no localStorage:", userDataForStorage);
-      localStorage.setItem("currentUser", JSON.stringify(userDataForStorage));
+  const login = async (email: string, password: string) => {
+    try {
+      try {
+        const apiResponse = await loginWithApi(email, password);
+
+        if (!apiResponse.user?.uid) {
+          throw new Error(apiResponse.error || "Erro ao autenticar");
+        }
+
+        if (apiResponse.token) {
+          storeAuthToken(apiResponse.token);
+        }
+
+        if (apiResponse.firebaseCustomToken) {
+          await establishFirebaseSession(apiResponse.firebaseCustomToken);
+        } else {
+          console.warn(
+            "Firebase custom token indisponível. Configure FIREBASE_SERVICE_ACCOUNT no backend para acessar envios."
+          );
+        }
+
+        await loadUserData(apiResponse.user.uid);
+        return;
+      } catch (apiError) {
+        const message =
+          apiError instanceof Error ? apiError.message : String(apiError);
+        const isCredentialError =
+          message.includes("não encontrado") ||
+          message.includes("incorreta") ||
+          message.includes("inativo") ||
+          message.includes("não cadastrada") ||
+          message.includes("inválid");
+
+        if (isCredentialError) {
+          throw apiError;
+        }
+
+        console.warn(
+          "API de login indisponível, usando autenticação direta no Firestore:",
+          message
+        );
+        await loginViaFirestore(email, password);
+      }
     } catch (error) {
       logAuthError(error, "login");
       throw error;

@@ -4,8 +4,8 @@ const {
   getAuth,
   isFirebaseAdminReady,
 } = require("../services/firebaseAdmin");
-const { signToken } = require("../middleware/auth");
-const { verifyPassword } = require("../utils/passwordUtils");
+const { signToken, authMiddleware } = require("../middleware/auth");
+const { hashPassword, verifyPassword } = require("../utils/passwordUtils");
 
 const router = express.Router();
 
@@ -101,6 +101,114 @@ router.post("/login", async (req, res) => {
     });
   } catch (error) {
     console.error("Erro no login:", error);
+    res.status(500).json({ success: false, error: error.message });
+  }
+});
+
+router.post("/refresh-firebase", authMiddleware, async (req, res) => {
+  try {
+    if (!isFirebaseAdminReady()) {
+      return res.status(503).json({
+        success: false,
+        error:
+          "Firebase Admin não configurado (FIREBASE_SERVICE_ACCOUNT ausente)",
+      });
+    }
+
+    const { uid, role, companyId } = req.user;
+    const auth = getAuth();
+    const firebaseCustomToken = await auth.createCustomToken(uid, {
+      role,
+      companyId: companyId || null,
+    });
+
+    res.json({ success: true, firebaseCustomToken });
+  } catch (error) {
+    console.error("Erro ao renovar custom token:", error);
+    res.status(500).json({ success: false, error: error.message });
+  }
+});
+
+router.post("/register-admin", async (req, res) => {
+  try {
+    const { name, email, password, adminCode } = req.body;
+
+    if (!name?.trim() || !email?.trim() || !password || !adminCode) {
+      return res.status(400).json({
+        success: false,
+        error: "Nome, email, senha e código de administrador são obrigatórios",
+      });
+    }
+
+    const expectedCode = process.env.ADMIN_CODE;
+    if (!expectedCode) {
+      return res.status(503).json({
+        success: false,
+        error: "Cadastro de administrador não configurado (ADMIN_CODE ausente)",
+      });
+    }
+
+    if (adminCode !== expectedCode) {
+      return res.status(403).json({
+        success: false,
+        error: "Código de administrador inválido",
+      });
+    }
+
+    if (password.length < 6) {
+      return res.status(400).json({
+        success: false,
+        error: "A senha deve ter pelo menos 6 caracteres",
+      });
+    }
+
+    if (!isFirebaseAdminReady()) {
+      return res.status(503).json({
+        success: false,
+        error:
+          "Servidor de autenticação não configurado (Firebase Admin ausente)",
+      });
+    }
+
+    const db = getFirestore();
+    const existingSnapshot = await db
+      .collection("users")
+      .where("email", "==", email.trim())
+      .limit(1)
+      .get();
+
+    if (!existingSnapshot.empty) {
+      return res.status(409).json({
+        success: false,
+        error: "Este email já está cadastrado",
+      });
+    }
+
+    const uid = `user_${Date.now()}`;
+    const passwordHash = hashPassword(password);
+
+    await db.collection("users").doc(uid).set({
+      uid,
+      displayName: name.trim(),
+      email: email.trim(),
+      passwordHash,
+      role: "admin",
+      isActive: true,
+      createdAt: new Date(),
+    });
+
+    res.status(201).json({
+      success: true,
+      user: {
+        uid,
+        email: email.trim(),
+        displayName: name.trim(),
+        role: "admin",
+        isActive: true,
+      },
+    });
+  } catch (error) {
+    console.error("Erro no cadastro de administrador:", error);
     res.status(500).json({ success: false, error: error.message });
   }
 });
