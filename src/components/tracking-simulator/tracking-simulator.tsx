@@ -1,9 +1,13 @@
 "use client";
 
-import { Play, Radio, RefreshCw } from "lucide-react";
+import { Play, RefreshCw } from "lucide-react";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useShipments, type Shipment } from "../../context/shipments-context";
 import { getStatusLabel } from "../../constants/statusOptions";
+import {
+  isCarrierApiAvailable,
+  runCarrierBatchSimulation,
+} from "../../services/carrierApi";
 import {
   getActiveShipmentsForTracking,
   simulateCarrierUpdate,
@@ -39,6 +43,27 @@ export function TrackingSimulator() {
       if (targetShipments.length === 0) {
         addLog("-", "Nenhum embarque ativo para rastreamento");
         return 0;
+      }
+
+      if (isCarrierApiAvailable()) {
+        try {
+          const batch = await runCarrierBatchSimulation(
+            Math.min(targetShipments.length, 3)
+          );
+          for (const result of batch.results) {
+            addLog(
+              result.numeroBl,
+              `${getStatusLabel(result.oldStatus)} → ${getStatusLabel(result.newStatus)} | API: ${result.carrierMessage}`
+            );
+          }
+          if (batch.updated === 0) {
+            addLog("-", "API: nenhuma atualização aplicada neste ciclo");
+          }
+          return batch.updated;
+        } catch (error) {
+          console.warn("API de transportadora indisponível, usando modo local:", error);
+          addLog("-", "API indisponível — usando simulação local");
+        }
       }
 
       let updated = 0;
@@ -110,6 +135,9 @@ export function TrackingSimulator() {
       <p className="tracking-status">
         Simulação de integração com transportadoras. Atualiza status e
         localização automaticamente para embarques em andamento.
+        {isCarrierApiAvailable() && (
+          <span className="tracking-badge">API ativa</span>
+        )}
         <span
           className={`tracking-badge ${autoTracking ? "" : "inactive"}`}
         >

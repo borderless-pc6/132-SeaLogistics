@@ -1,6 +1,10 @@
 const express = require("express");
 const { getFirestore, isFirebaseAdminReady } = require("../services/firebaseAdmin");
 const { authMiddleware, requireRole } = require("../middleware/auth");
+const {
+  sendClientStatusUpdateNotification,
+  sendClientShipmentNotification,
+} = require("../services/notificationService");
 
 const router = express.Router();
 
@@ -84,11 +88,20 @@ router.post("/", requireRole("admin", "operator", "company_user"), async (req, r
     data.updatedAt = new Date();
 
     const docRef = await db.collection("shipments").add(data);
+    const shipment = { id: docRef.id, ...data };
+
+    let notifications = { email: false, whatsapp: false };
+    try {
+      notifications = await sendClientShipmentNotification(shipment);
+    } catch (notifyError) {
+      console.error("Erro ao notificar novo embarque:", notifyError.message);
+    }
 
     res.status(201).json({
       success: true,
       id: docRef.id,
-      shipment: { id: docRef.id, ...data },
+      shipment,
+      notifications,
     });
   } catch (error) {
     console.error("Erro ao criar embarque:", error);
@@ -185,9 +198,23 @@ router.patch("/:id/status", requireRole("admin", "operator", "company_user"), as
       changedAt: new Date(),
     });
 
+    const updatedShipment = { id: req.params.id, ...existingData, ...updates };
+    let notifications = { email: false, whatsapp: false };
+    if (existingData.status !== status) {
+      try {
+        notifications = await sendClientStatusUpdateNotification(
+          updatedShipment,
+          existingData.status
+        );
+      } catch (notifyError) {
+        console.error("Erro ao notificar mudança de status:", notifyError.message);
+      }
+    }
+
     res.json({
       success: true,
-      shipment: { id: req.params.id, ...existingData, ...updates },
+      shipment: updatedShipment,
+      notifications,
     });
   } catch (error) {
     console.error("Erro ao atualizar status:", error);

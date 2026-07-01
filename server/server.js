@@ -10,6 +10,7 @@ const cors = require("cors");
 const twilio = require("twilio");
 const authRoutes = require("./routes/auth");
 const shipmentRoutes = require("./routes/shipments");
+const carrierRoutes = require("./routes/carrier");
 const {
   sendEmail,
   verifyEmailConnection,
@@ -76,6 +77,9 @@ app.use("/api/auth", authRoutes);
 
 // API REST de embarques (JWT)
 app.use("/api/shipments", shipmentRoutes);
+
+// API de simulação de transportadoras (JWT — admin/operador)
+app.use("/api/carrier", carrierRoutes);
 
 // Rota raiz
 app.get("/", (req, res) => {

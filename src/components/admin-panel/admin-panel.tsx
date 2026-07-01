@@ -8,14 +8,14 @@ import {
   setDoc,
   updateDoc,
 } from "firebase/firestore";
-import { UserPlus } from "lucide-react";
+import { UserPlus, Bell } from "lucide-react";
 import type React from "react";
 import { useEffect, useState } from "react";
 import { useAuth } from "../../context/auth-context";
 import { useLanguage } from "../../context/language-context";
 import type { Shipment } from "../../context/shipments-context";
 import { db } from "../../lib/firebaseConfig";
-import { type Company, type User, UserRole } from "../../types/user";
+import { type Company, type User, UserRole, type NotificationPreferences } from "../../types/user";
 import { hashPassword } from "../../utils/passwordUtils";
 import { TemplateEditor } from "../template-editor/template-editor";
 import "./admin-panel.css";
@@ -57,6 +57,16 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({ onClose, initialTab }) =
     companyName?: string;
     companyCode?: string;
   }>({});
+  const [editingCompanyNotifications, setEditingCompanyNotifications] =
+    useState<Company | null>(null);
+  const [companyNotificationPrefs, setCompanyNotificationPrefs] =
+    useState<NotificationPreferences>({
+      email: true,
+      whatsapp: true,
+      statusUpdates: true,
+      newShipments: true,
+    });
+  const [savingNotifications, setSavingNotifications] = useState(false);
 
   useEffect(() => {
     if (!isAdmin()) return;
@@ -220,6 +230,40 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({ onClose, initialTab }) =
     if (!companyId) return translations.notAssigned;
     const company = companies.find((c) => c.id === companyId);
     return company ? company.name : translations.companyLabel + " não encontrada";
+  };
+
+  const openCompanyNotifications = (company: Company) => {
+    setEditingCompanyNotifications(company);
+    setCompanyNotificationPrefs({
+      email: company.notificationPreferences?.email ?? true,
+      whatsapp: company.notificationPreferences?.whatsapp ?? true,
+      statusUpdates: company.notificationPreferences?.statusUpdates ?? true,
+      newShipments: company.notificationPreferences?.newShipments ?? true,
+    });
+  };
+
+  const saveCompanyNotifications = async () => {
+    if (!editingCompanyNotifications) return;
+    setSavingNotifications(true);
+    try {
+      await updateDoc(doc(db, "companies", editingCompanyNotifications.id), {
+        notificationPreferences: companyNotificationPrefs,
+        updatedAt: new Date(),
+      });
+      setCompanies(
+        companies.map((c) =>
+          c.id === editingCompanyNotifications.id
+            ? { ...c, notificationPreferences: companyNotificationPrefs }
+            : c
+        )
+      );
+      setEditingCompanyNotifications(null);
+    } catch (error) {
+      console.error("Erro ao salvar notificações da empresa:", error);
+      alert("Erro ao salvar preferências de notificação.");
+    } finally {
+      setSavingNotifications(false);
+    }
   };
 
   const handleCreateUser = async () => {
@@ -588,6 +632,14 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({ onClose, initialTab }) =
                         >
                           {company.isActive ? translations.deactivate : translations.activate}
                         </button>
+                        <button
+                          type="button"
+                          onClick={() => openCompanyNotifications(company)}
+                          style={{ marginLeft: "0.5rem" }}
+                          title="Configurar notificações"
+                        >
+                          <Bell size={14} style={{ verticalAlign: "middle" }} /> Notif.
+                        </button>
                       </td>
                     </tr>
                   ))}
@@ -660,6 +712,74 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({ onClose, initialTab }) =
           <div className="admin-section">
             <h3>Templates de Notificação</h3>
             <TemplateEditor />
+          </div>
+        )}
+
+        {editingCompanyNotifications && (
+          <div className="admin-panel" style={{ zIndex: 1100 }}>
+            <div className="admin-panel-content" style={{ maxWidth: "480px" }}>
+              <div className="admin-panel-header">
+                <h2>Notificações — {editingCompanyNotifications.name}</h2>
+                <button
+                  type="button"
+                  onClick={() => setEditingCompanyNotifications(null)}
+                  className="close-button"
+                >
+                  ×
+                </button>
+              </div>
+              <div className="admin-section">
+                <p style={{ marginBottom: "1rem", color: "#64748b" }}>
+                  Configure quais notificações o cliente recebe para esta empresa.
+                </p>
+                {(
+                  [
+                    ["email", "E-mail"],
+                    ["whatsapp", "WhatsApp"],
+                    ["statusUpdates", "Atualizações de status"],
+                    ["newShipments", "Novos embarques"],
+                  ] as const
+                ).map(([key, label]) => (
+                  <label
+                    key={key}
+                    style={{
+                      display: "flex",
+                      alignItems: "center",
+                      gap: "0.5rem",
+                      marginBottom: "0.75rem",
+                      cursor: "pointer",
+                    }}
+                  >
+                    <input
+                      type="checkbox"
+                      checked={companyNotificationPrefs[key]}
+                      onChange={(e) =>
+                        setCompanyNotificationPrefs((prev) => ({
+                          ...prev,
+                          [key]: e.target.checked,
+                        }))
+                      }
+                    />
+                    {label}
+                  </label>
+                ))}
+                <div style={{ display: "flex", gap: "0.75rem", marginTop: "1.5rem" }}>
+                  <button
+                    type="button"
+                    onClick={saveCompanyNotifications}
+                    disabled={savingNotifications}
+                  >
+                    {savingNotifications ? "Salvando..." : "Salvar"}
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setEditingCompanyNotifications(null)}
+                  >
+                    Cancelar
+                  </button>
+                </div>
+              </div>
+            </div>
           </div>
         )}
 
