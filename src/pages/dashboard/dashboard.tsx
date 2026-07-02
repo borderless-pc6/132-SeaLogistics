@@ -232,10 +232,13 @@ export const Dashboard = () => {
   }
 
   return (
-    <main className="dashboard-container">
+    <main className="dashboard-container page-layout">
       <Navbar />
-      <div className="dashboard-content">
-        <div className="dashboard-header">
+      <div className="dashboard-content page-content fade-in">
+        <div className="page-header dashboard-header">
+          <span className="page-header__eyebrow">
+            <Ship size={14} /> Sea Logistics
+          </span>
           <h1>{translations.dashboard}</h1>
           <p>
             {translations.welcomeUser} {currentUser?.displayName}!

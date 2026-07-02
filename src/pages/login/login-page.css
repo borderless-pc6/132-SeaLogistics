@@ -3,74 +3,54 @@
   justify-content: center;
   align-items: center;
   min-height: 100vh;
-  background: linear-gradient(
-    135deg,
-    var(--primary-color) 0%,
-    var(--secondary-color) 100%
-  );
+  background: var(--bg-sidebar);
   position: relative;
   overflow: hidden;
-  padding: 1rem 0;
+  padding: 1.5rem;
 }
 
 .login-container::before {
   content: "";
   position: absolute;
-  bottom: -50px;
-  left: 0;
-  right: 0;
-  height: 100px;
-  background: rgba(255, 255, 255, 0.1);
-  border-radius: 100%;
-  width: 200%;
-  margin-left: -50%;
-  animation: wave 15s infinite linear;
+  inset: 0;
+  background:
+    radial-gradient(ellipse 70% 60% at 10% 20%, rgba(61, 186, 140, 0.15) 0%, transparent 55%),
+    radial-gradient(ellipse 50% 50% at 90% 80%, rgba(30, 77, 71, 0.2) 0%, transparent 50%);
+  pointer-events: none;
 }
 
 .login-container::after {
   content: "";
   position: absolute;
-  bottom: -80px;
+  bottom: 0;
   left: 0;
   right: 0;
-  height: 120px;
-  background: rgba(255, 255, 255, 0.05);
-  border-radius: 100%;
-  width: 200%;
-  margin-left: -50%;
-  animation: wave 10s infinite linear;
-  animation-delay: -5s;
-}
-
-@keyframes wave {
-  0% {
-    transform: translateX(0) translateZ(0) scaleY(1);
-  }
-  50% {
-    transform: translateX(-25%) translateZ(0) scaleY(0.8);
-  }
-  100% {
-    transform: translateX(-50%) translateZ(0) scaleY(1);
-  }
+  height: 200px;
+  background: linear-gradient(to top, rgba(0, 0, 0, 0.15), transparent);
+  pointer-events: none;
 }
 
 .login-card {
-  background-color: var(--white);
-  border-radius: 10px;
-  box-shadow: var(--box-shadow);
-  width: 90%;
-  max-width: 450px;
-  max-height: 90vh;
+  background: rgba(255, 255, 255, 0.97);
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
+  border-radius: var(--radius-xl);
+  box-shadow: var(--shadow-xl);
+  border: 1px solid rgba(255, 255, 255, 0.6);
+  width: 100%;
+  max-width: 440px;
+  max-height: 92vh;
   overflow-y: auto;
-  padding: 2rem;
+  padding: 2.5rem 2rem;
   position: relative;
   z-index: 1;
-  margin: 1rem 0;
+  animation: scaleIn 0.5s var(--ease-spring);
 }
 
 @media (max-width: 480px) {
   .login-card {
-    padding: 1.5rem;
+    padding: 2rem 1.5rem;
+    border-radius: var(--radius-lg);
     max-height: 95vh;
   }
 }

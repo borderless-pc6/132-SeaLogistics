@@ -13,8 +13,8 @@ import { db } from "../../lib/firebaseConfig";
 import { sendEmail } from "../../services/emailService";
 import {
   exportShipmentToExcel,
-  exportShipmentsReport,
 } from "../../services/excelExportService";
+import { ReportExportButton } from "../report-export-button/report-export-button";
 import { EmptyState } from "../empty-state/empty-state";
 import { DocumentManager } from "../document-manager";
 import { DocumentViewer } from "../document-viewer";
@@ -298,15 +298,6 @@ const ShippingTable = ({
     }
   };
 
-  const exportAllToExcel = () => {
-    try {
-      exportShipmentsReport(filteredAndSortedShipments);
-    } catch (error) {
-      console.error("Erro ao exportar relatório:", error);
-      alert("Erro ao exportar relatório Excel. Tente novamente.");
-    }
-  };
-
   const exportToPDF = async (shipment: Shipment) => {
     try {
       console.log(
@@ -425,14 +416,7 @@ const ShippingTable = ({
         <div className="shipping-table-header">
           <h2 className="shipping-table-title">{translations.shippingTable}</h2>
           {filteredAndSortedShipments.length > 0 && (
-            <button
-              type="button"
-              className="export-all-button"
-              onClick={exportAllToExcel}
-            >
-              <FileSpreadsheet size={18} />
-              Exportar Relatório Excel
-            </button>
+            <ReportExportButton shipments={filteredAndSortedShipments} />
           )}
         </div>
 

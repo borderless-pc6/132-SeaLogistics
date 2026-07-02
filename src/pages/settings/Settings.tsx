@@ -1,7 +1,7 @@
   "use client";
 
-import { doc, getDoc, updateDoc } from "firebase/firestore";
-import { Bell, MessageCircle, Save, User } from "lucide-react";
+import { doc, getDoc, setDoc, updateDoc } from "firebase/firestore";
+import { Bell, Save, User } from "lucide-react";
 import { useContext, useEffect, useState } from "react";
 import ChatAssistant from "../../components/chat-assistant/chat-assistant";
 import Navbar from "../../components/navbar/navbar";
@@ -10,8 +10,8 @@ import { useAuth } from "../../context/auth-context";
 import { LanguageProvider, useLanguage } from "../../context/language-context";
 import { useToast } from "../../context/toast-context";
 import { db } from "../../lib/firebaseConfig";
+import { registerFcmToken, unregisterFcmToken, verifyPushConnection } from "../../services/pushNotificationService";
 import type { UserSettings } from "../../types/user";
-import { UserRole } from "../../types/user";
 import "./Settings.css";
 
 const SettingsContent = () => {
@@ -53,7 +53,6 @@ const SettingsContent = () => {
     position: "",
     notifications: {
       email: true,
-      whatsapp: false,
       push: true,
       statusUpdates: true,
       newShipments: true,
@@ -68,9 +67,11 @@ const SettingsContent = () => {
 
   const [isLoading, setIsLoading] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
+  const [pushBackendReady, setPushBackendReady] = useState<boolean | null>(null);
 
   useEffect(() => {
     loadUserSettings();
+    verifyPushConnection().then(setPushBackendReady).catch(() => setPushBackendReady(false));
   }, []);
 
   const loadUserSettings = async () => {
@@ -79,6 +80,8 @@ const SettingsContent = () => {
       const userDoc = await getDoc(doc(db, "users", currentUserId));
       if (userDoc.exists()) {
         const userData = userDoc.data();
+        const notifications = userData.notifications || {};
+        const prefs = userData.notificationPreferences || {};
         setUserSettings({
           name: userData.name || currentUser.name || "",
           email: userData.email || currentUser.email || "",
@@ -86,7 +89,18 @@ const SettingsContent = () => {
           whatsappPhone: userData.whatsappPhone || userData.phone || "",
           company: userData.company || "",
           position: userData.position || "",
-          notifications: userData.notifications || userSettings.notifications,
+          notifications: {
+            email: notifications.email ?? prefs.email ?? true,
+            push:
+              notifications.push ??
+              prefs.push ??
+              prefs.whatsapp ??
+              true,
+            statusUpdates:
+              notifications.statusUpdates ?? prefs.statusUpdates ?? true,
+            newShipments:
+              notifications.newShipments ?? prefs.newShipments ?? true,
+          },
           preferences: userData.preferences || userSettings.preferences,
         });
       } else {
@@ -102,7 +116,9 @@ const SettingsContent = () => {
           createdAt: new Date(),
         };
 
-        await updateDoc(doc(db, "users", currentUserId), initialUserData);
+        await setDoc(doc(db, "users", currentUserId), initialUserData, {
+          merge: true,
+        });
         setUserSettings((prev) => ({
           ...prev,
           ...initialUserData,
@@ -123,7 +139,9 @@ const SettingsContent = () => {
           createdAt: new Date(),
         };
 
-        await updateDoc(doc(db, "users", currentUserId), initialUserData);
+        await setDoc(doc(db, "users", currentUserId), initialUserData, {
+          merge: true,
+        });
         setUserSettings((prev) => ({
           ...prev,
           ...initialUserData,
@@ -188,19 +206,23 @@ const SettingsContent = () => {
   const handleSaveSettings = async () => {
     setIsSaving(true);
     try {
-      // Atualizar documento do usuário no Firestore
+      if (userSettings.notifications.push) {
+        await registerFcmToken(currentUserId);
+      } else {
+        await unregisterFcmToken(currentUserId);
+      }
+
       await updateDoc(doc(db, "users", currentUserId), {
         name: userSettings.name,
         email: userSettings.email,
         phone: userSettings.phone,
-        whatsappPhone: userSettings.whatsappPhone,
         company: userSettings.company,
         position: userSettings.position,
         notifications: userSettings.notifications,
         preferences: userSettings.preferences,
         notificationPreferences: {
           email: userSettings.notifications.email,
-          whatsapp: userSettings.notifications.whatsapp,
+          push: userSettings.notifications.push,
           statusUpdates: userSettings.notifications.statusUpdates,
           newShipments: userSettings.notifications.newShipments,
         },
@@ -299,31 +321,6 @@ const SettingsContent = () => {
                     />
                   </div>
 
-                  {/* Campo WhatsApp apenas para COMPANY_USER */}
-                  {currentUser.role === UserRole.COMPANY_USER && (
-                    <div className="form-group">
-                      <label htmlFor="whatsappPhone">
-                        {translations.whatsapp}{" "}
-                        <span style={{ fontSize: "0.85rem", color: "#888" }}>
-                          {translations.whatsappForNotifications}
-                        </span>
-                      </label>
-                      <input
-                        type="tel"
-                        id="whatsappPhone"
-                        value={userSettings.whatsappPhone}
-                        onChange={(e) =>
-                          handlePhoneChange("whatsappPhone", e.target.value)
-                        }
-                        placeholder={translations.phonePlaceholder}
-                        maxLength={15}
-                      />
-                      <small style={{ color: "#666", fontSize: "0.85rem" }}>
-                        {translations.whatsappFormat}
-                      </small>
-                    </div>
-                  )}
-
                   <div className="form-group">
                     <label htmlFor="company">{translations.company}</label>
                     <input
@@ -359,148 +356,62 @@ const SettingsContent = () => {
                   <h2>{translations.notifications}</h2>
                 </div>
 
-                {/* Canais de Notificação - apenas para COMPANY_USER */}
-                {currentUser.role === UserRole.COMPANY_USER && (
-                  <>
-                    <div style={{ marginBottom: "1.5rem" }}>
-                      <h3
-                        style={{
-                          fontSize: "1rem",
-                          color: "#2c3e50",
-                          marginBottom: "0.75rem",
-                          fontWeight: 600,
-                        }}
-                      >
-                        {translations.notificationChannels}
-                      </h3>
-                      <p
-                        style={{
-                          fontSize: "0.9rem",
-                          color: "#7f8c8d",
-                          marginBottom: "1rem",
-                        }}
-                      >
-                        {translations.chooseNotificationMethod}
-                      </p>
-                    </div>
-
-                    <div className="notification-settings">
-                      <div className="notification-item">
-                        <div className="notification-info">
-                          <h3>📧 {translations.emailNotifications}</h3>
-                          <p>{translations.receiveImportantUpdates}</p>
-                        </div>
-                        <label className="switch">
-                          <input
-                            type="checkbox"
-                            checked={userSettings.notifications.email}
-                            onChange={(e) =>
-                              handleNestedChange(
-                                "notifications",
-                                "email",
-                                e.target.checked
-                              )
-                            }
-                          />
-                          <span className="slider"></span>
-                        </label>
-                      </div>
-
-                      <div className="notification-item">
-                        <div className="notification-info">
-                          <h3 style={{ display: "flex", alignItems: "center", gap: "0.5rem" }}>
-                            <MessageCircle size={18} />
-                            {translations.whatsappNotifications}
-                          </h3>
-                          <p>
-                            {translations.receiveRealTimeWhatsapp}
-                            {!userSettings.whatsappPhone && (
-                              <span style={{ color: "#e74c3c", marginLeft: "0.5rem" }}>
-                                {translations.configureNumberAbove}
-                              </span>
-                            )}
-                          </p>
-                        </div>
-                        <label className="switch">
-                          <input
-                            type="checkbox"
-                            checked={userSettings.notifications.whatsapp}
-                            onChange={(e) =>
-                              handleNestedChange(
-                                "notifications",
-                                "whatsapp",
-                                e.target.checked
-                              )
-                            }
-                            disabled={!userSettings.whatsappPhone}
-                          />
-                          <span className="slider"></span>
-                        </label>
-                      </div>
-                    </div>
-
-                    <div style={{ marginTop: "2rem", marginBottom: "1rem" }}>
-                      <h3
-                        style={{
-                          fontSize: "1rem",
-                          color: "#2c3e50",
-                          marginBottom: "0.75rem",
-                          fontWeight: 600,
-                        }}
-                      >
-                        {translations.notificationTypes}
-                      </h3>
-                    </div>
-                  </>
+                {pushBackendReady !== null && (
+                  <p
+                    style={{
+                      fontSize: "0.9rem",
+                      color: pushBackendReady ? "#27ae60" : "#e67e22",
+                      marginBottom: "1rem",
+                    }}
+                  >
+                    {pushBackendReady
+                      ? "Servidor de push configurado."
+                      : "Servidor de push não detectado — notificações no navegador podem não funcionar até configurar FIREBASE_SERVICE_ACCOUNT no backend."}
+                  </p>
                 )}
 
                 <div className="notification-settings">
-                  {/* Push apenas para admin */}
-                  {currentUser.role !== UserRole.COMPANY_USER && (
-                    <>
-                      <div className="notification-item">
-                        <div className="notification-info">
-                          <h3>{translations.emailNotifications}</h3>
-                          <p>{translations.receiveImportantUpdates}</p>
-                        </div>
-                        <label className="switch">
-                          <input
-                            type="checkbox"
-                            checked={userSettings.notifications.email}
-                            onChange={(e) =>
-                              handleNestedChange(
-                                "notifications",
-                                "email",
-                                e.target.checked
-                              )
-                            }
-                          />
-                          <span className="slider"></span>
-                        </label>
-                      </div>
+                  <div className="notification-item">
+                    <div className="notification-info">
+                      <h3>{translations.emailNotifications}</h3>
+                      <p>{translations.receiveImportantUpdates}</p>
+                    </div>
+                    <label className="switch">
+                      <input
+                        type="checkbox"
+                        checked={userSettings.notifications.email}
+                        onChange={(e) =>
+                          handleNestedChange(
+                            "notifications",
+                            "email",
+                            e.target.checked
+                          )
+                        }
+                      />
+                      <span className="slider"></span>
+                    </label>
+                  </div>
 
-                      <div className="notification-item">
-                        <div className="notification-info">
-                          <h3>{translations.pushNotifications}</h3>
-                          <p>{translations.receiveRealTimeBrowser}</p>
-                        </div>
-                        <label className="switch">
-                          <input
-                            type="checkbox"
-                            checked={userSettings.notifications.push}
-                            onChange={(e) =>
-                              handleNestedChange(
-                                "notifications",
-                                "push",
-                                e.target.checked
-                              )
-                            }
-                          />
-                          <span className="slider"></span>
-                        </label>
-                      </div>
-                    </>
-                  )}
+                  <div className="notification-item">
+                    <div className="notification-info">
+                      <h3>{translations.pushNotifications}</h3>
+                      <p>{translations.receiveRealTimeBrowser}</p>
+                    </div>
+                    <label className="switch">
+                      <input
+                        type="checkbox"
+                        checked={userSettings.notifications.push}
+                        onChange={(e) =>
+                          handleNestedChange(
+                            "notifications",
+                            "push",
+                            e.target.checked
+                          )
+                        }
+                      />
+                      <span className="slider"></span>
+                    </label>
+                  </div>
 
                   <div className="notification-item">
                     <div className="notification-info">

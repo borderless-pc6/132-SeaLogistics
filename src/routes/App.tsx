@@ -18,6 +18,7 @@ import { LoginPage as Login } from "../pages/login/login-page";
 import NovoEnvioPage from "../pages/novo-envio/novo-envio";
 import { RegisterPage as Register } from "../pages/register/register-page";
 import { Settings } from "../pages/settings/Settings";
+import { PushNotificationListener } from "../components/push-notification-listener/push-notification-listener";
 
 export const App = () => {
   return (
@@ -29,6 +30,7 @@ export const App = () => {
             <Router
               future={{ v7_startTransition: true, v7_relativeSplatPath: true }}
             >
+              <PushNotificationListener />
               <div className="app-container">
                 <Routes>
                   <Route path="/" element={<Login />} />
@@ -85,17 +87,17 @@ export const App = () => {
                   <Route
                     path="/excel-integration"
                     element={
-                      <PrivateRoute>
+                      <AdminRoute>
                         <ExcelIntegrationPage />
-                      </PrivateRoute>
+                      </AdminRoute>
                     }
                   />
                   <Route
                     path="/excel-test"
                     element={
-                      <PrivateRoute>
+                      <AdminRoute>
                         <ExcelSpecificTest />
-                      </PrivateRoute>
+                      </AdminRoute>
                     }
                   />
                   <Route

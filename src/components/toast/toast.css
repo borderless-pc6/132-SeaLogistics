@@ -10,25 +10,26 @@
 }
 
 .toast {
-  min-width: 320px;
-  max-width: 500px;
+  min-width: 300px;
+  max-width: 420px;
   padding: 0;
-  border-radius: 12px;
-  box-shadow: 0 10px 25px rgba(0, 0, 0, 0.15), 0 4px 10px rgba(0, 0, 0, 0.1);
+  border-radius: var(--radius-md);
+  box-shadow: var(--shadow-lg);
   display: flex;
   flex-direction: column;
   pointer-events: auto;
   cursor: default;
-  animation: slideIn 0.4s cubic-bezier(0.68, -0.55, 0.265, 1.55);
-  transition: transform 0.2s, opacity 0.2s, box-shadow 0.2s;
+  animation: slideIn 0.35s var(--ease-spring);
+  transition: transform var(--transition-fast), opacity var(--transition-fast);
   overflow: hidden;
   position: relative;
-  background: white;
+  background: var(--bg-card);
+  border: 1px solid var(--border-color);
 }
 
 .toast:hover {
-  transform: translateX(-4px);
-  box-shadow: 0 12px 30px rgba(0, 0, 0, 0.2), 0 6px 15px rgba(0, 0, 0, 0.15);
+  transform: translateX(-3px);
+  box-shadow: var(--shadow-xl);
 }
 
 .toast-content {

@@ -1,51 +1,52 @@
 @import "./utils/colors.css";
+@import "./utils/design-system.css";
 @import "./utils/animations.css";
 @import "./styles/navbar-layout.css";
 
 /* Reset e estilos base */
-* {
+*,
+*::before,
+*::after {
   margin: 0;
   padding: 0;
   box-sizing: border-box;
 }
 
-html, body {
+html {
   height: 100%;
+  scroll-behavior: smooth;
 }
 
 body {
-  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', 'Oxygen',
-    'Ubuntu', 'Cantarell', 'Fira Sans', 'Droid Sans', 'Helvetica Neue',
-    sans-serif;
+  height: 100%;
+  font-family: var(--font-sans);
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
-  background-color: #f5f7fa;
+  background-color: var(--bg-page);
+  color: var(--text-primary);
+  line-height: 1.5;
 }
 
 #root {
   height: 100%;
 }
 
-/* Container principal da aplicação */
 .app-container {
   min-height: 100vh;
   display: flex;
   flex-direction: column;
 }
 
-/* Estilos para o conteúdo principal */
 .app-container > *:not(:last-child) {
   flex: 1;
 }
 
-/* Estilos para o footer */
 .app-container > :last-child {
   margin-top: auto;
 }
 
 code {
-  font-family: source-code-pro, Menlo, Monaco, Consolas, 'Courier New',
-    monospace;
+  font-family: var(--font-mono);
 }
 
 a {
@@ -65,25 +66,16 @@ button {
   font-family: inherit;
 }
 
-/* Removido o reset global para imagens que estava causando problemas no footer */
-/* img {
-  max-width: 100%;
-  display: block;
-} */
-
 input,
 textarea,
 select {
   font: inherit;
   color: inherit;
-  background: none;
-  border: none;
-  outline: none;
 }
 
 .container {
   width: 100%;
-  max-width: 1200px;
+  max-width: 1280px;
   margin: 0 auto;
   padding: 1rem;
 }
@@ -92,79 +84,55 @@ select {
   display: none !important;
 }
 
-/* Estilos globais unificados para formulários */
+/* Formulários globais */
 .form-group {
   display: flex;
   flex-direction: column;
-  gap: 0.75rem;
-  /* Prevenir expansão automática */
+  gap: 0.5rem;
   min-width: 0;
   max-width: 100%;
-  overflow: hidden;
 }
 
 .form-group label {
-  color: #2c3e50;
-  font-weight: 500;
-  font-size: 0.9rem;
+  color: var(--text-primary);
+  font-weight: 600;
+  font-size: var(--text-sm);
 }
 
 .form-group input,
 .form-group select,
 .form-group textarea {
   padding: 0.75rem 1rem;
-  border: 2px solid #e9ecef;
-  border-radius: 8px;
-  font-size: 1rem;
-  transition: all 0.2s ease;
-  background: white;
-  /* Corrigir problema de texto que vaza */
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
+  border: 1.5px solid var(--gray-200);
+  border-radius: var(--radius-sm);
+  font-size: var(--text-base);
+  transition: border-color var(--transition-fast), box-shadow var(--transition-fast);
+  background: var(--white);
   max-width: 100%;
   box-sizing: border-box;
+}
+
+.form-group input:hover:not(:disabled),
+.form-group select:hover:not(:disabled),
+.form-group textarea:hover:not(:disabled) {
+  border-color: var(--gray-300);
 }
 
 .form-group input:focus,
 .form-group select:focus,
 .form-group textarea:focus {
   outline: none;
-  border-color: #118ab2;
-  box-shadow: 0 0 0 3px rgba(17, 138, 178, 0.1);
+  border-color: var(--accent-color);
+  box-shadow: var(--shadow-focus);
 }
 
-.form-group input:required:invalid,
-.form-group select:required:invalid {
-  border-color: #e74c3c;
-}
-
-.form-group input:required:valid,
-.form-group select:required:valid {
-  border-color: #27ae60;
-}
-
-/* Estilos específicos para campos de aeroporto */
 .form-group select[name="pol"],
 .form-group select[name="pod"] {
-  /* Garantir que o texto não vaze */
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  /* Tamanho fixo para evitar expansão */
-  width: 100%;
-  min-width: 0;
-  /* Prevenir que o texto mude o tamanho do campo */
-  font-size: 0.9rem;
+  font-size: var(--text-sm);
   line-height: 1.2;
 }
 
-/* Estilos para as opções do dropdown */
 .form-group select option {
-  /* Garantir que as opções tenham tamanho consistente */
-  font-size: 0.9rem;
+  font-size: var(--text-sm);
   padding: 0.5rem;
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
 }

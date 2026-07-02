@@ -7,10 +7,10 @@ dotenv.config({ path: path.join(__dirname, ".env") });
 
 const express = require("express");
 const cors = require("cors");
-const twilio = require("twilio");
 const authRoutes = require("./routes/auth");
 const shipmentRoutes = require("./routes/shipments");
 const carrierRoutes = require("./routes/carrier");
+const notificationRoutes = require("./routes/notifications");
 const {
   sendEmail,
   verifyEmailConnection,
@@ -80,6 +80,9 @@ app.use("/api/shipments", shipmentRoutes);
 
 // API de simulação de transportadoras (JWT — admin/operador)
 app.use("/api/carrier", carrierRoutes);
+
+// API de notificações push (Firebase FCM)
+app.use("/api/notifications", notificationRoutes);
 
 // Rota raiz
 app.get("/", (req, res) => {
@@ -321,371 +324,20 @@ app.get(
 );
 
 // ==========================================
-// CONFIGURAÇÃO WHATSAPP (META CLOUD API / TWILIO)
+// FIREBASE CLOUD MESSAGING (PUSH)
 // ==========================================
 
-// Detecta se o Twilio está configurado
-const hasTwilioConfig = !!(
-  process.env.TWILIO_ACCOUNT_SID &&
-  process.env.TWILIO_AUTH_TOKEN &&
-  process.env.TWILIO_WHATSAPP_FROM
-);
+const { isFcmConfigured } = require("./services/pushNotificationService");
 
-let twilioClient = null;
-if (hasTwilioConfig) {
-  twilioClient = twilio(
-    process.env.TWILIO_ACCOUNT_SID,
-    process.env.TWILIO_AUTH_TOKEN
-  );
-  console.log("Twilio WhatsApp configurado (modo envio).");
-}
-
-// Helper para normalizar número para formato Twilio (whatsapp:+5511999999999)
-const formatWhatsAppNumberForTwilio = (phone) => {
-  if (!phone) return phone;
-
-  let cleaned = String(phone).trim();
-
-  // Se já vier com prefixo whatsapp:, mantém
-  if (cleaned.startsWith("whatsapp:")) {
-    return cleaned;
-  }
-
-  // Garante o +
-  if (!cleaned.startsWith("+")) {
-    cleaned = `+${cleaned}`;
-  }
-
-  return `whatsapp:${cleaned}`;
-};
-
-// ==========================================
-// ROTAS WHATSAPP
-// ==========================================
-
-// Rota para enviar mensagem WhatsApp
-app.post("/api/whatsapp/send-message", async (req, res) => {
-  try {
-    console.log("=== ENVIANDO MENSAGEM WHATSAPP ===");
-    const { to, message, template } = req.body;
-
-    if (!to || !message) {
-      return res.status(400).json({
-        success: false,
-        error: 'Parâmetros "to" e "message" são obrigatórios',
-      });
-    }
-
-    console.log("Enviando para:", to);
-    console.log("Mensagem:", message.substring(0, 100) + "...");
-
-    // ==========================================
-    // MODO TWILIO (PREFERENCIAL SE CONFIGURADO)
-    // ==========================================
-    if (hasTwilioConfig && twilioClient) {
-      try {
-        const fromNumber = formatWhatsAppNumberForTwilio(
-          process.env.TWILIO_WHATSAPP_FROM
-        );
-        const toNumber = formatWhatsAppNumberForTwilio(to);
-
-        console.log("Usando Twilio WhatsApp para envio.");
-        console.log("From:", fromNumber);
-        console.log("To:", toNumber);
-
-        const twilioMessage = await twilioClient.messages.create({
-          from: fromNumber,
-          to: toNumber,
-          body: message,
-        });
-
-        console.log("=== MENSAGEM WHATSAPP (TWILIO) ENVIADA COM SUCESSO ===");
-        console.log("SID:", twilioMessage.sid);
-
-        return res.json({
-          success: true,
-          messageId: twilioMessage.sid,
-          provider: "twilio",
-        });
-      } catch (twilioError) {
-        console.error("Erro ao enviar mensagem via Twilio:", twilioError);
-        return res.status(500).json({
-          success: false,
-          error:
-            twilioError.message ||
-            "Erro ao enviar mensagem via Twilio WhatsApp",
-        });
-      }
-    }
-
-    // ==========================================
-    // FALLBACK: META WHATSAPP CLOUD API
-    // (mantém compatibilidade futura quando Meta estiver aprovada)
-    // ==========================================
-
-    const phoneNumberId = process.env.WHATSAPP_PHONE_NUMBER_ID;
-    const accessToken = process.env.WHATSAPP_ACCESS_TOKEN;
-
-    if (!phoneNumberId || !accessToken) {
-      return res.status(500).json({
-        success: false,
-        error:
-          "Nenhuma integração de WhatsApp configurada (Twilio ou Meta). Verifique as variáveis de ambiente.",
-      });
-    }
-
-    const apiVersion = process.env.WHATSAPP_API_VERSION || "v21.0";
-    const url = `https://graph.facebook.com/${apiVersion}/${phoneNumberId}/messages`;
-
-    const body = template
-      ? {
-          messaging_product: "whatsapp",
-          to: to,
-          type: "template",
-          template: {
-            name: template.name,
-            language: {
-              code: template.language || "pt_BR",
-            },
-            components: [
-              {
-                type: "body",
-                parameters: template.parameters.map((param) => ({
-                  type: "text",
-                  text: param,
-                })),
-              },
-            ],
-          },
-        }
-      : {
-          messaging_product: "whatsapp",
-          recipient_type: "individual",
-          to: to,
-          type: "text",
-          text: {
-            preview_url: true,
-            body: message,
-          },
-        };
-
-    const response = await fetch(url, {
-      method: "POST",
-      headers: {
-        Authorization: `Bearer ${accessToken}`,
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify(body),
-    });
-
-    const responseData = await response.json();
-
-    if (!response.ok) {
-      console.error("Erro da WhatsApp API (Meta):", responseData);
-      return res.status(response.status).json({
-        success: false,
-        error: responseData.error?.message || "Erro ao enviar mensagem",
-        details: responseData,
-      });
-    }
-
-    console.log("=== MENSAGEM WHATSAPP (META) ENVIADA COM SUCESSO ===");
-    console.log("Message ID:", responseData.messages?.[0]?.id);
-
-    res.json({
-      success: true,
-      messageId: responseData.messages?.[0]?.id,
-      provider: "meta",
-      response: responseData,
-    });
-  } catch (error) {
-    console.error("=== ERRO AO ENVIAR MENSAGEM WHATSAPP ===");
-    console.error("Detalhes do erro:", error);
-    res.status(500).json({
-      success: false,
-      error: error.message,
-    });
-  }
-});
-
-// Webhook para receber mensagens e status (POST)
-app.post("/api/whatsapp/webhook", async (req, res) => {
-  try {
-    console.log("=== WEBHOOK WHATSAPP RECEBIDO ===");
-    console.log("Timestamp:", new Date().toISOString());
-    console.log("Body:", JSON.stringify(req.body, null, 2));
-
-    const { entry } = req.body;
-
-    if (!entry || !Array.isArray(entry)) {
-      return res.sendStatus(200);
-    }
-
-    for (const item of entry) {
-      const changes = item.changes || [];
-
-      for (const change of changes) {
-        const value = change.value;
-
-        if (value.messages && Array.isArray(value.messages)) {
-          for (const msg of value.messages) {
-            console.log("Mensagem recebida:", {
-              from: msg.from,
-              type: msg.type,
-              text: msg.text?.body,
-              timestamp: msg.timestamp,
-            });
-
-            // Aqui você pode implementar lógica de resposta automática
-            // Por exemplo: rastreamento automático ao receber um número de booking
-            // const booking = msg.text?.body;
-            // const shipmentData = await buscarPorBooking(booking);
-            // await enviarRastreamento(msg.from, shipmentData);
-          }
-        }
-
-        // Status de mensagem (enviada, entregue, lida)
-        if (value.statuses && Array.isArray(value.statuses)) {
-          for (const status of value.statuses) {
-            console.log("Status de mensagem:", {
-              id: status.id,
-              status: status.status,
-              timestamp: status.timestamp,
-              recipient: status.recipient_id,
-            });
-          }
-        }
-      }
-    }
-
-    res.sendStatus(200);
-  } catch (error) {
-    console.error("=== ERRO AO PROCESSAR WEBHOOK WHATSAPP ===");
-    console.error("Detalhes do erro:", error);
-    res.sendStatus(500);
-  }
-});
-
-// Verificação do Webhook (GET)
-app.get("/api/whatsapp/webhook", (req, res) => {
-  const mode = req.query["hub.mode"];
-  const token = req.query["hub.verify_token"];
-  const challenge = req.query["hub.challenge"];
-
-  console.log("=== VERIFICAÇÃO DE WEBHOOK WHATSAPP ===");
-  console.log("Mode:", mode);
-  console.log("Token recebido:", token);
-
-  const verifyToken = process.env.WHATSAPP_VERIFY_TOKEN;
-
-  if (mode === "subscribe" && token === verifyToken) {
-    console.log("Webhook verificado com sucesso!");
-    res.status(200).send(challenge);
-  } else {
-    console.error("Falha na verificação do webhook");
-    res.sendStatus(403);
-  }
-});
-
-// Rota para verificar status de mensagem
-app.get("/api/whatsapp/message-status/:messageId", async (req, res) => {
-  try {
-    const { messageId } = req.params;
-    console.log("=== VERIFICANDO STATUS DE MENSAGEM ===");
-    console.log("Message ID:", messageId);
-
-    // Se Twilio estiver configurado, tenta via Twilio
-    if (hasTwilioConfig && twilioClient) {
-      try {
-        const twilioMessage = await twilioClient.messages(messageId).fetch();
-
-        return res.json({
-          success: true,
-          provider: "twilio",
-          status: {
-            sid: twilioMessage.sid,
-            status: twilioMessage.status,
-            to: twilioMessage.to,
-            from: twilioMessage.from,
-            dateCreated: twilioMessage.dateCreated,
-            dateUpdated: twilioMessage.dateUpdated,
-            errorCode: twilioMessage.errorCode,
-            errorMessage: twilioMessage.errorMessage,
-          },
-        });
-      } catch (twilioError) {
-        console.error(
-          "Erro ao verificar status via Twilio:",
-          twilioError.message || twilioError
-        );
-        return res.status(500).json({
-          success: false,
-          error:
-            twilioError.message ||
-            "Erro ao verificar status da mensagem via Twilio",
-        });
-      }
-    }
-
-    // Fallback para Meta
-    const accessToken = process.env.WHATSAPP_ACCESS_TOKEN;
-    const apiVersion = process.env.WHATSAPP_API_VERSION || "v21.0";
-
-    const url = `https://graph.facebook.com/${apiVersion}/${messageId}`;
-
-    const response = await fetch(url, {
-      headers: {
-        Authorization: `Bearer ${accessToken}`,
-      },
-    });
-
-    const data = await response.json();
-
-    if (!response.ok) {
-      return res.status(response.status).json({
-        success: false,
-        error: data.error?.message || "Erro ao verificar status",
-      });
-    }
-
-    res.json({
-      success: true,
-      provider: "meta",
-      status: data,
-    });
-  } catch (error) {
-    console.error("=== ERRO AO VERIFICAR STATUS ===");
-    console.error("Detalhes do erro:", error);
-    res.status(500).json({
-      success: false,
-      error: error.message,
-    });
-  }
-});
-
-// Rota para verificar configuração do WhatsApp
-app.get("/api/whatsapp/verify", (req, res) => {
-  const hasMetaConfig = !!(
-    process.env.WHATSAPP_PHONE_NUMBER_ID && process.env.WHATSAPP_ACCESS_TOKEN
-  );
-
-  const hasTwilio = hasTwilioConfig;
-
-  const success = hasMetaConfig || hasTwilio;
-
+app.get("/api/push/verify", (req, res) => {
+  const configured = isFcmConfigured();
   res.json({
-    success,
-    configured: success,
-    provider: hasTwilio ? "twilio" : hasMetaConfig ? "meta" : null,
-    phoneNumberMaskedMeta: hasMetaConfig
-      ? "***" + process.env.WHATSAPP_PHONE_NUMBER_ID.slice(-4)
-      : null,
-    fromTwilio: hasTwilio ? process.env.TWILIO_WHATSAPP_FROM : null,
-    message: success
-      ? hasTwilio
-        ? "WhatsApp configurado via Twilio"
-        : "WhatsApp configurado via Meta Cloud API"
-      : "WhatsApp não configurado (nem Twilio nem Meta)",
+    success: configured,
+    configured,
+    provider: "firebase-fcm",
+    message: configured
+      ? "Firebase Cloud Messaging configurado"
+      : "Configure FIREBASE_SERVICE_ACCOUNT para habilitar push notifications",
   });
 });
 

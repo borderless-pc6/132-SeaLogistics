@@ -30,6 +30,7 @@ import {
 } from "../utils/authErrorHandler";
 import { verifyPassword } from "../utils/passwordUtils";
 import { retryWithBackoff } from "../utils/retryWithBackoff";
+import { registerFcmToken, shouldRegisterPush, unregisterFcmToken } from "../services/pushNotificationService";
 
 interface AuthContextType {
   currentUser: User | null;
@@ -42,6 +43,10 @@ interface AuthContextType {
   isCompanyUser: () => boolean;
   canAccessAdminFeatures: () => boolean;
   canManageShipments: () => boolean;
+  canCreateShipment: () => boolean;
+  canImportShipments: () => boolean;
+  canSyncExcel: () => boolean;
+  canDeleteAllShipments: () => boolean;
   loading: boolean;
   refreshUserData: () => Promise<void>;
 }
@@ -155,6 +160,12 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
         const userData = { ...userDoc.data(), uid: userDoc.id } as User;
         console.log("Dados do usuário carregados:", userData);
         setCurrentUser(userData);
+
+        if (shouldRegisterPush(userData)) {
+          registerFcmToken(userId).catch((err) =>
+            console.warn("[FCM] Falha ao registrar token:", err)
+          );
+        }
 
         // Atualizar localStorage com dados mais recentes
         localStorage.setItem(
@@ -536,6 +547,13 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
   const logout = async () => {
     console.log("Fazendo logout...");
 
+    const userId = currentUser?.uid;
+    if (userId) {
+      await unregisterFcmToken(userId).catch((err) =>
+        console.warn("[FCM] Falha ao remover token no logout:", err)
+      );
+    }
+
     if (tokenCheckIntervalRef.current) {
       clearInterval(tokenCheckIntervalRef.current);
       tokenCheckIntervalRef.current = null;
@@ -577,7 +595,23 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
   };
 
   const canManageShipments = () => {
-    return isStaff() || currentUser?.role === UserRole.COMPANY_USER;
+    return isStaff();
+  };
+
+  const canCreateShipment = () => {
+    return isStaff();
+  };
+
+  const canImportShipments = () => {
+    return isAdmin();
+  };
+
+  const canSyncExcel = () => {
+    return isAdmin();
+  };
+
+  const canDeleteAllShipments = () => {
+    return isAdmin();
   };
 
   const value: AuthContextType = {
@@ -591,6 +625,10 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
     isCompanyUser,
     canAccessAdminFeatures,
     canManageShipments,
+    canCreateShipment,
+    canImportShipments,
+    canSyncExcel,
+    canDeleteAllShipments,
     loading,
     refreshUserData,
   };

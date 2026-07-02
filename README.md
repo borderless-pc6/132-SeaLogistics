@@ -21,8 +21,8 @@ O Sea Logistics é uma plataforma completa para gerenciamento de envios e logís
 - **Backend**: Firebase (Firestore, Authentication, Storage)
 - **Integrações**: 
   - Microsoft 365 / Azure AD (Excel/OneDrive)
-  - WhatsApp Business API
   - EmailJS / Nodemailer
+  - Firebase Cloud Messaging (push)
 - **UI**: Lucide React Icons, Recharts
 - **Validação**: Zod
 - **Roteamento**: React Router v6
@@ -103,9 +103,10 @@ Para integração com Excel:
 - Registre uma aplicação no Azure Portal
 - Configure `VITE_AZURE_CLIENT_ID` e `VITE_AZURE_REDIRECT_URI`
 
-### WhatsApp
-Configure o servidor WhatsApp Business API:
-- `VITE_WHATSAPP_SERVER_URL`
+### Firebase Cloud Messaging
+Gere a chave VAPID em Firebase Console > Project Settings > Cloud Messaging:
+- `VITE_FIREBASE_VAPID_KEY`
+- `FIREBASE_SERVICE_ACCOUNT` (backend)
 
 ## 📝 Funcionalidades Principais
 
@@ -126,8 +127,8 @@ Configure o servidor WhatsApp Business API:
 - Sincronização bidirecional
 
 ### Notificações
-- WhatsApp para clientes
-- Emails automáticos
+- Push notifications via Firebase Cloud Messaging (FCM)
+- Emails automáticos (SendGrid)
 - Atualizações de status
 
 ## 🌍 Idiomas Suportados

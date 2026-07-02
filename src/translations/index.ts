@@ -442,6 +442,9 @@ export const translations = {
 
     // Export
     exportReport: "Export Report",
+    exportReports: "Report Export",
+    exportAsExcel: "Excel (.xlsx)",
+    exportAsPDF: "PDF (.pdf)",
     reportGenerated: "Report Generated",
     exportSuccess: "Report exported successfully!",
     exportError: "Error exporting report. Try again.",
@@ -906,6 +909,9 @@ export const translations = {
 
     // Export
     exportReport: "Exportar Relatório",
+    exportReports: "Exportação de Relatórios",
+    exportAsExcel: "Excel (.xlsx)",
+    exportAsPDF: "PDF (.pdf)",
     reportGenerated: "Relatório Gerado",
     exportSuccess: "Relatório exportado com sucesso!",
     exportError: "Erro ao exportar relatório. Tente novamente.",
@@ -1370,6 +1376,9 @@ export const translations = {
 
     // Export
     exportReport: "Exportar Informe",
+    exportReports: "Exportación de Informes",
+    exportAsExcel: "Excel (.xlsx)",
+    exportAsPDF: "PDF (.pdf)",
     reportGenerated: "Informe Generado",
     exportSuccess: "¡Informe exportado con éxito!",
     exportError: "Error al exportar informe. Intente nuevamente.",

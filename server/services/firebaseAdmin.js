@@ -44,10 +44,16 @@ function getAuth() {
   return admin.auth();
 }
 
+function getMessaging() {
+  if (!isFirebaseAdminReady()) return null;
+  return admin.messaging();
+}
+
 module.exports = {
   admin,
   initFirebaseAdmin,
   isFirebaseAdminReady,
   getFirestore,
   getAuth,
+  getMessaging,
 };

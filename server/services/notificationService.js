@@ -1,11 +1,15 @@
 const { getFirestore } = require("./firebaseAdmin");
 const { sendEmail } = require("./emailService");
-const { renderEmailTemplate, renderWhatsAppTemplate } = require("./templateService");
-const { sendWhatsAppMessage } = require("./whatsappService");
+const {
+  renderEmailTemplate,
+  renderPushTemplate,
+  getStatusLabel,
+} = require("./templateService");
+const { sendPushToCompanyUsers } = require("./pushNotificationService");
 
 const DEFAULT_PREFERENCES = {
   email: true,
-  whatsapp: true,
+  push: true,
   statusUpdates: true,
   newShipments: true,
 };
@@ -16,20 +20,13 @@ function normalizeEmail(value) {
   return trimmed.includes("@") ? trimmed : null;
 }
 
-function normalizePhone(value) {
-  if (typeof value !== "string") return null;
-  const digits = value.replace(/\D/g, "");
-  if (digits.length < 10) return null;
-  return digits.startsWith("55") ? digits : `55${digits}`;
-}
-
-function mergePreferences(raw, hasPhone) {
+function mergePreferences(raw) {
   if (!raw || typeof raw !== "object") {
-    return { ...DEFAULT_PREFERENCES, whatsapp: hasPhone };
+    return { ...DEFAULT_PREFERENCES };
   }
   return {
     email: raw.email ?? DEFAULT_PREFERENCES.email,
-    whatsapp: raw.whatsapp ?? hasPhone,
+    push: raw.push ?? raw.whatsapp ?? DEFAULT_PREFERENCES.push,
     statusUpdates: raw.statusUpdates ?? DEFAULT_PREFERENCES.statusUpdates,
     newShipments: raw.newShipments ?? DEFAULT_PREFERENCES.newShipments,
   };
@@ -44,11 +41,8 @@ async function resolveCompanyClientContact(companyId) {
 
   const companyData = companyDoc.data();
   let email = normalizeEmail(companyData.contactEmail);
-  let phone = normalizePhone(
-    companyData.whatsappPhone || companyData.phone
-  );
 
-  if (!email || !phone) {
+  if (!email) {
     const usersSnap = await db
       .collection("users")
       .where("companyId", "==", companyId)
@@ -58,29 +52,22 @@ async function resolveCompanyClientContact(companyId) {
     for (const userDoc of usersSnap.docs) {
       const userData = userDoc.data();
       if (!email) email = normalizeEmail(userData.email);
-      if (!phone) {
-        phone = normalizePhone(userData.whatsappPhone || userData.phone);
-      }
-      if (email && phone) break;
+      if (email) break;
     }
   }
 
-  const preferences = mergePreferences(
-    companyData.notificationPreferences,
-    Boolean(phone)
-  );
+  const preferences = mergePreferences(companyData.notificationPreferences);
 
   return {
     companyId,
     companyName: companyData.name || "Cliente",
     email,
-    phone,
     preferences,
   };
 }
 
 async function sendClientStatusUpdateNotification(shipment, oldStatus) {
-  const results = { email: false, whatsapp: false };
+  const results = { email: false, push: false };
 
   if (!shipment.companyId) {
     return results;
@@ -109,20 +96,28 @@ async function sendClientStatusUpdateNotification(shipment, oldStatus) {
     }
   }
 
-  const testPhone = process.env.WHATSAPP_TEST_PHONE;
-  const whatsappNumber = contact.phone || testPhone;
-
-  if ((contact.preferences.whatsapp || testPhone) && whatsappNumber) {
+  if (contact.preferences.push) {
     try {
-      const message = await renderWhatsAppTemplate(
-        "status_update_whatsapp",
+      const body = await renderPushTemplate(
+        "status_update_push",
         shipment,
         { oldStatus }
       );
-      const result = await sendWhatsAppMessage({ to: whatsappNumber, message });
-      results.whatsapp = result.success;
+      const pushResult = await sendPushToCompanyUsers(
+        shipment.companyId,
+        contact.preferences,
+        "status_update",
+        shipment,
+        {
+          oldStatus,
+          oldStatusLabel: getStatusLabel(oldStatus),
+          statusLabel: getStatusLabel(shipment.status),
+          body,
+        }
+      );
+      results.push = pushResult.success;
     } catch (error) {
-      console.error("[Notificação] Erro ao enviar WhatsApp de status:", error.message);
+      console.error("[Notificação] Erro ao enviar push de status:", error.message);
     }
   }
 
@@ -130,7 +125,7 @@ async function sendClientStatusUpdateNotification(shipment, oldStatus) {
 }
 
 async function sendClientShipmentNotification(shipment) {
-  const results = { email: false, whatsapp: false };
+  const results = { email: false, push: false };
 
   if (!shipment.companyId) {
     return results;
@@ -158,19 +153,19 @@ async function sendClientShipmentNotification(shipment) {
     }
   }
 
-  const testPhone = process.env.WHATSAPP_TEST_PHONE;
-  const whatsappNumber = contact.phone || testPhone;
-
-  if ((contact.preferences.whatsapp || testPhone) && whatsappNumber) {
+  if (contact.preferences.push) {
     try {
-      const message = await renderWhatsAppTemplate(
-        "new_shipment_whatsapp",
-        shipment
+      const body = await renderPushTemplate("new_shipment_push", shipment);
+      const pushResult = await sendPushToCompanyUsers(
+        shipment.companyId,
+        contact.preferences,
+        "new_shipment",
+        shipment,
+        { body }
       );
-      const result = await sendWhatsAppMessage({ to: whatsappNumber, message });
-      results.whatsapp = result.success;
+      results.push = pushResult.success;
     } catch (error) {
-      console.error("[Notificação] Erro ao enviar WhatsApp de novo envio:", error.message);
+      console.error("[Notificação] Erro ao enviar push de novo envio:", error.message);
     }
   }
 

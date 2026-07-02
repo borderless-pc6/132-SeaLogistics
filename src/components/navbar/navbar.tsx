@@ -85,7 +85,7 @@ const Navbar = () => {
             </span>
           </div>
 
-          {/* Botão Novo Envio - apenas para admins */}
+          {/* Novo Envio — equipe operacional (admin/operador) */}
           {isStaff() && (
             <div
               className={`nav-item ${activeItem === "novo-envio" ? "active" : ""

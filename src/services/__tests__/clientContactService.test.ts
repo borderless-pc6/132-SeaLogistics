@@ -29,18 +29,26 @@ describe("clientContactService", () => {
       mergeClientNotificationPreferences(undefined, true)
     ).toEqual({
       email: true,
-      whatsapp: true,
+      push: true,
       statusUpdates: true,
       newShipments: true,
     });
   });
 
-  it("respects explicit whatsapp opt-out", () => {
+  it("respects explicit push opt-out", () => {
+    expect(
+      mergeClientNotificationPreferences({ push: false }, true)
+    ).toMatchObject({
+      push: false,
+      email: true,
+    });
+  });
+
+  it("maps legacy whatsapp preference to push", () => {
     expect(
       mergeClientNotificationPreferences({ whatsapp: false }, true)
     ).toMatchObject({
-      whatsapp: false,
-      email: true,
+      push: false,
     });
   });
 });

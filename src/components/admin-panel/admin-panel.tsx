@@ -17,6 +17,7 @@ import type { Shipment } from "../../context/shipments-context";
 import { db } from "../../lib/firebaseConfig";
 import { type Company, type User, UserRole, type NotificationPreferences } from "../../types/user";
 import { hashPassword } from "../../utils/passwordUtils";
+import { mergeClientNotificationPreferences } from "../../services/clientContactService";
 import { TemplateEditor } from "../template-editor/template-editor";
 import "./admin-panel.css";
 
@@ -62,7 +63,7 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({ onClose, initialTab }) =
   const [companyNotificationPrefs, setCompanyNotificationPrefs] =
     useState<NotificationPreferences>({
       email: true,
-      whatsapp: true,
+      push: true,
       statusUpdates: true,
       newShipments: true,
     });
@@ -234,12 +235,9 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({ onClose, initialTab }) =
 
   const openCompanyNotifications = (company: Company) => {
     setEditingCompanyNotifications(company);
-    setCompanyNotificationPrefs({
-      email: company.notificationPreferences?.email ?? true,
-      whatsapp: company.notificationPreferences?.whatsapp ?? true,
-      statusUpdates: company.notificationPreferences?.statusUpdates ?? true,
-      newShipments: company.notificationPreferences?.newShipments ?? true,
-    });
+    setCompanyNotificationPrefs(
+      mergeClientNotificationPreferences(company.notificationPreferences, true)
+    );
   };
 
   const saveCompanyNotifications = async () => {
@@ -735,7 +733,7 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({ onClose, initialTab }) =
                 {(
                   [
                     ["email", "E-mail"],
-                    ["whatsapp", "WhatsApp"],
+                    ["push", "Push (Firebase)"],
                     ["statusUpdates", "Atualizações de status"],
                     ["newShipments", "Novos embarques"],
                   ] as const

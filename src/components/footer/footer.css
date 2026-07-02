@@ -1,0 +1,11 @@
+.footer-container {
+  position: relative;
+  z-index: 5;
+  margin-top: auto;
+}
+
+.footer-container footer,
+.footer-container > div {
+  border-top: 1px solid var(--border-color, rgba(26, 40, 48, 0.08));
+  background: var(--bg-card, #ffffff) !important;
+}

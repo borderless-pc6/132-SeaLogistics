@@ -13,16 +13,40 @@ export interface CompanyClientContact {
   companyId: string;
   companyName: string;
   email: string | null;
-  phone: string | null;
   preferences: NotificationPreferences;
 }
 
-const DEFAULT_PREFERENCES: NotificationPreferences = {
+export const DEFAULT_NOTIFICATION_PREFERENCES: NotificationPreferences = {
   email: true,
-  whatsapp: true,
+  push: true,
   statusUpdates: true,
   newShipments: true,
 };
+
+export function mergeClientNotificationPreferences(
+  raw: unknown,
+  hasPushTarget = true
+): NotificationPreferences {
+  if (!raw || typeof raw !== "object") {
+    return {
+      ...DEFAULT_NOTIFICATION_PREFERENCES,
+      push: hasPushTarget,
+    };
+  }
+
+  const prefs = raw as Partial<NotificationPreferences>;
+  const push =
+    prefs.push ?? prefs.whatsapp ?? (hasPushTarget ? true : false);
+
+  return {
+    email: prefs.email ?? DEFAULT_NOTIFICATION_PREFERENCES.email,
+    push,
+    statusUpdates:
+      prefs.statusUpdates ?? DEFAULT_NOTIFICATION_PREFERENCES.statusUpdates,
+    newShipments:
+      prefs.newShipments ?? DEFAULT_NOTIFICATION_PREFERENCES.newShipments,
+  };
+}
 
 export function normalizeClientEmail(value: unknown): string | null {
   if (typeof value !== "string") return null;
@@ -37,44 +61,8 @@ export function normalizeClientPhone(value: unknown): string | null {
   return digits.startsWith("55") ? digits : `55${digits}`;
 }
 
-export function mergeClientNotificationPreferences(
-  raw: unknown,
-  hasPhone: boolean
-): NotificationPreferences {
-  if (!raw || typeof raw !== "object") {
-    return {
-      ...DEFAULT_PREFERENCES,
-      whatsapp: hasPhone,
-    };
-  }
-
-  const prefs = raw as Partial<NotificationPreferences>;
-  return {
-    email: prefs.email ?? DEFAULT_PREFERENCES.email,
-    whatsapp: prefs.whatsapp ?? hasPhone,
-    statusUpdates: prefs.statusUpdates ?? DEFAULT_PREFERENCES.statusUpdates,
-    newShipments: prefs.newShipments ?? DEFAULT_PREFERENCES.newShipments,
-  };
-}
-
-function normalizeEmail(value: unknown): string | null {
-  return normalizeClientEmail(value);
-}
-
-function normalizePhone(value: unknown): string | null {
-  return normalizeClientPhone(value);
-}
-
-function mergePreferences(
-  raw: unknown,
-  hasPhone: boolean
-): NotificationPreferences {
-  return mergeClientNotificationPreferences(raw, hasPhone);
-}
-
 /**
- * Resolve email e telefone do cliente final a partir da empresa (Firebase).
- * Prioridade: contactEmail/phone da empresa → usuários vinculados à empresa.
+ * Resolve email e preferências do cliente a partir da empresa (Firebase).
  */
 export async function resolveCompanyClientContact(
   companyId: string
@@ -85,36 +73,31 @@ export async function resolveCompanyClientContact(
   if (!companyDoc.exists()) return null;
 
   const companyData = companyDoc.data();
-  let email = normalizeEmail(companyData.contactEmail);
-  let phone = normalizePhone(
-    companyData.whatsappPhone || companyData.phone
+  let email = normalizeClientEmail(companyData.contactEmail);
+  let hasPushUsers = false;
+
+  const usersSnap = await getDocs(
+    query(collection(db, "users"), where("companyId", "==", companyId))
   );
 
-  if (!email || !phone) {
-    const usersSnap = await getDocs(
-      query(collection(db, "users"), where("companyId", "==", companyId))
-    );
-
-    for (const userDoc of usersSnap.docs) {
-      const userData = userDoc.data();
-      if (!email) email = normalizeEmail(userData.email);
-      if (!phone) {
-        phone = normalizePhone(userData.whatsappPhone || userData.phone);
-      }
-      if (email && phone) break;
+  for (const userDoc of usersSnap.docs) {
+    const userData = userDoc.data();
+    if (!email) email = normalizeClientEmail(userData.email);
+    if (Array.isArray(userData.fcmTokens) && userData.fcmTokens.length > 0) {
+      hasPushUsers = true;
     }
+    if (email && hasPushUsers) break;
   }
 
-  const preferences = mergePreferences(
+  const preferences = mergeClientNotificationPreferences(
     companyData.notificationPreferences,
-    Boolean(phone)
+    hasPushUsers
   );
 
   return {
     companyId,
     companyName: companyData.name || "Cliente",
     email,
-    phone,
     preferences,
   };
 }

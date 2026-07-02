@@ -56,7 +56,7 @@ const DEFAULT_TEMPLATES: Record<NotificationTemplateId, NotificationTemplate> = 
   },
   new_shipment_whatsapp: {
     id: "new_shipment_whatsapp",
-    name: "Novo Envio (WhatsApp)",
+    name: "Novo Envio (WhatsApp — legado)",
     body: `🚢 *Novo Envio Registrado - Sea Logistics*
 
 Olá! 👋
@@ -80,7 +80,7 @@ _Sea Logistics International_`,
   },
   status_update_whatsapp: {
     id: "status_update_whatsapp",
-    name: "Atualização de Status (WhatsApp)",
+    name: "Atualização de Status (WhatsApp — legado)",
     body: `🔔 *Atualização de Status - Sea Logistics*
 
 Olá {{cliente}},
@@ -95,7 +95,7 @@ _Sea Logistics International_`,
   },
   tracking_whatsapp: {
     id: "tracking_whatsapp",
-    name: "Rastreamento (WhatsApp)",
+    name: "Rastreamento (WhatsApp — legado)",
     body: `📍 *Rastreamento de Carga - Sea Logistics*
 
 *Booking:* {{booking}}
@@ -142,7 +142,7 @@ _Sea Logistics International_`,
   },
   jabil_shipment_whatsapp: {
     id: "jabil_shipment_whatsapp",
-    name: "Embarque Internacional WhatsApp (JABIL)",
+    name: "Embarque Internacional WhatsApp (JABIL — legado)",
     body: `🚢 *Embarque Internacional*
 
 Prezado(a) *{{cliente}}*,
@@ -155,6 +155,51 @@ Prezado(a) *{{cliente}}*,
 • Status: {{status}}
 
 _Sea Logistics_`,
+  },
+  new_shipment_push: {
+    id: "new_shipment_push",
+    name: "Novo Envio (Push)",
+    body: `🚢 Novo envio registrado — BL {{numeroBl}}
+
+Cliente: {{cliente}}
+Rota: {{pol}} → {{pod}}
+ETD: {{etdOrigem}} | ETA: {{etaDestino}}
+Status: {{status}}
+
+Sea Logistics`,
+  },
+  status_update_push: {
+    id: "status_update_push",
+    name: "Atualização de Status (Push)",
+    body: `🔔 Status atualizado — BL {{numeroBl}}
+
+{{cliente}}: {{oldStatus}} → {{status}}
+Rota: {{pol}} → {{pod}}
+Localização: {{currentLocation}}
+
+Sea Logistics`,
+  },
+  tracking_push: {
+    id: "tracking_push",
+    name: "Rastreamento (Push)",
+    body: `📍 Rastreamento — BL {{numeroBl}}
+
+{{pol}} → {{pod}}
+Localização: {{currentLocation}}
+Status: {{status}}
+
+Sea Logistics`,
+  },
+  jabil_shipment_push: {
+    id: "jabil_shipment_push",
+    name: "Embarque Internacional Push (JABIL)",
+    body: `🚢 Embarque internacional — {{cliente}}
+
+Booking: {{booking}} | Navio: {{navio}}
+ETD: {{etdOrigem}} | ETA: {{etaDestino}}
+Status: {{status}}
+
+Sea Logistics`,
   },
 };
 
@@ -273,7 +318,27 @@ export async function renderWhatsAppTemplate(
   shipment: Shipment,
   extra?: { oldStatus?: string }
 ): Promise<string> {
-  const template = await getTemplate(id);
+  return renderPushTemplate(id, shipment, extra);
+}
+
+export async function renderPushTemplate(
+  id:
+    | "new_shipment_push"
+    | "status_update_push"
+    | "tracking_push"
+    | "jabil_shipment_push"
+    | "new_shipment_whatsapp"
+    | "status_update_whatsapp"
+    | "tracking_whatsapp"
+    | "jabil_shipment_whatsapp",
+  shipment: Shipment,
+  extra?: { oldStatus?: string }
+): Promise<string> {
+  const pushId = id.replace("_whatsapp", "_push") as NotificationTemplateId;
+  const resolvedId = DEFAULT_TEMPLATES[pushId]
+    ? pushId
+    : (id as NotificationTemplateId);
+  const template = await getTemplate(resolvedId);
   const variables = buildTemplateVariables(shipment, extra);
   return interpolateTemplate(template.body, variables);
 }

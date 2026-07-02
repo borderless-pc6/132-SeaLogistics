@@ -39,7 +39,9 @@ export interface User {
   role: UserRole;
   companyId?: string; // Para usuários de empresa
   companyName?: string; // Cache do nome da empresa
-  phone?: string; // Telefone/WhatsApp do usuário
+  phone?: string;
+  /** Tokens FCM para push notifications no navegador */
+  fcmTokens?: string[];
   isActive: boolean;
   createdAt: Date;
   lastLogin?: Date;
@@ -47,10 +49,12 @@ export interface User {
 }
 
 export interface NotificationPreferences {
-  email: boolean; // Receber notificações por email
-  whatsapp: boolean; // Receber notificações por WhatsApp
-  statusUpdates: boolean; // Notificar mudanças de status
-  newShipments: boolean; // Notificar novos envios
+  email: boolean;
+  push: boolean;
+  /** @deprecated Use push — compatibilidade com dados antigos */
+  whatsapp?: boolean;
+  statusUpdates: boolean;
+  newShipments: boolean;
 }
 
 export interface UserSettings {
@@ -62,8 +66,9 @@ export interface UserSettings {
   position: string;
   notifications: {
     email: boolean;
-    whatsapp: boolean; // Notificações via WhatsApp
     push: boolean;
+    /** @deprecated Use push */
+    whatsapp?: boolean;
     statusUpdates: boolean;
     newShipments: boolean;
   };

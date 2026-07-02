@@ -1,37 +1,61 @@
 .split-card {
-  background-color: white;
-  border-radius: 0.5rem;
-  box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1),
-    0 4px 6px -2px rgba(0, 0, 0, 0.05);
-  width: 90%;
-  max-width: 1000px;
+  background: rgba(255, 255, 255, 0.97);
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
+  border-radius: var(--radius-xl);
+  box-shadow: var(--shadow-xl);
+  border: 1px solid rgba(255, 255, 255, 0.6);
+  width: 100%;
+  max-width: 960px;
   display: flex;
   flex-direction: column;
   overflow: hidden;
   position: relative;
   z-index: 10;
+  animation: scaleIn 0.5s var(--ease-spring);
+}
+
+@media (min-width: 768px) {
+  .split-card {
+    flex-direction: row;
+    min-height: 560px;
+  }
 }
 
 .split-branding {
-  background-color: #305951;
-  padding: 1.5rem;
+  background: var(--bg-sidebar);
+  padding: 2.5rem 2rem;
   color: white;
   display: flex;
   flex-direction: column;
   justify-content: center;
   align-items: center;
+  position: relative;
+  overflow: hidden;
+}
+
+.split-branding::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background:
+    radial-gradient(ellipse 80% 60% at 20% 80%, rgba(61, 186, 140, 0.2) 0%, transparent 60%);
+  pointer-events: none;
 }
 
 .split-branding-content {
   margin-bottom: 1.5rem;
   text-align: center;
+  position: relative;
+  z-index: 1;
 }
 
 .split-welcome-title {
-  font-size: 1.5rem;
-  font-weight: 600;
+  font-size: var(--text-2xl);
+  font-weight: 700;
   margin-bottom: 1rem;
   color: white;
+  letter-spacing: -0.02em;
 }
 
 .split-logo {
@@ -42,33 +66,43 @@
 }
 
 .split-logo-image {
-  max-width: 200px;
-  max-height: 200px;
+  max-width: 140px;
+  max-height: 80px;
   width: auto;
   height: auto;
   object-fit: contain;
+  filter: brightness(1.1);
 }
 
 .split-logo-text {
-  font-size: 1.5rem;
+  font-size: var(--text-xl);
   font-weight: 700;
   margin-top: 0.5rem;
 }
 
 .split-description {
-  margin-top: 1rem;
-  color: rgba(255, 255, 255, 0.8);
+  margin-top: 0.75rem;
+  color: rgba(255, 255, 255, 0.75);
+  font-size: var(--text-sm);
+  line-height: 1.6;
+  max-width: 280px;
 }
 
 .split-form-container {
-  padding: 1.5rem;
+  padding: 2rem 2rem;
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
 }
 
 .split-title {
-  font-size: 1.25rem;
+  font-size: var(--text-xl);
   text-align: center;
-  color: var(--primary-color);
-  margin-bottom: 1rem;
+  color: var(--text-primary);
+  font-weight: 700;
+  margin-bottom: 1.5rem;
+  letter-spacing: -0.01em;
 }
 
 .split-form {
@@ -80,7 +114,59 @@
 .split-form-group {
   display: flex;
   flex-direction: column;
-  gap: 0.5rem;
+  gap: 0.375rem;
+}
+
+.split-form-group label {
+  font-size: var(--text-sm);
+  font-weight: 600;
+  color: var(--text-primary);
+}
+
+.split-form-group input,
+.split-form-group select {
+  padding: 0.75rem 1rem;
+  border: 1.5px solid var(--gray-200);
+  border-radius: var(--radius-sm);
+  font-size: var(--text-base);
+  transition: border-color var(--transition-fast), box-shadow var(--transition-fast);
+  background: var(--white);
+}
+
+.split-form-group input:focus,
+.split-form-group select:focus {
+  outline: none;
+  border-color: var(--accent-color);
+  box-shadow: var(--shadow-focus);
+}
+
+.split-submit-button,
+.split-button {
+  background: linear-gradient(135deg, var(--primary-color) 0%, var(--primary-light) 100%);
+  color: white;
+  border: none;
+  border-radius: var(--radius-md);
+  padding: 0.875rem 1.5rem;
+  font-size: var(--text-base);
+  font-weight: 600;
+  cursor: pointer;
+  transition: all var(--transition-fast);
+  margin-top: 0.5rem;
+  box-shadow: 0 4px 14px rgba(30, 77, 71, 0.3);
+  width: 100%;
+}
+
+.split-submit-button:hover:not(:disabled),
+.split-button:hover:not(:disabled) {
+  background: linear-gradient(135deg, var(--primary-light) 0%, var(--accent-color) 100%);
+  transform: translateY(-1px);
+  box-shadow: 0 6px 20px rgba(30, 77, 71, 0.4);
+}
+
+.split-submit-button:disabled,
+.split-button:disabled {
+  opacity: 0.65;
+  cursor: not-allowed;
 }
 
 .split-password-grid {
@@ -89,105 +175,33 @@
   gap: 1rem;
 }
 
-.split-form-group label {
-  font-weight: bold;
-  color: var(--secondary-color);
-}
-
-.split-form-group input {
-  padding: 0.75rem;
-  border: 1px solid #d1d5db;
-  border-radius: 4px;
-  font-size: 1rem;
-  transition: border-color 0.3s;
-  background-color: white;
-}
-
-.split-form-group input:focus {
-  outline: none;
-  border-color: var(--primary-color);
-  box-shadow: 0 0 0 3px rgba(48, 89, 81, 0.1);
-}
-
-.split-form-group input:hover {
-  border-color: #9ca3af;
-}
-
-.split-button {
-  background-color: var(--primary-color);
-  color: var(--white);
-  border: none;
-  border-radius: 4px;
-  padding: 0.75rem;
-  font-size: 1rem;
-  font-weight: bold;
-  cursor: pointer;
-  transition: background-color 0.3s;
-  margin-top: 0.5rem;
-}
-
-.split-button:hover {
-  background-color: var(--secondary-color);
-}
-
 .split-login-link {
-  margin-top: 1.5rem;
+  margin-top: 1.25rem;
   text-align: center;
-  font-size: 0.875rem;
-  color: #4b5563;
+  font-size: var(--text-sm);
+  color: var(--text-secondary);
+  padding-top: 1.25rem;
+  border-top: 1px solid var(--border-color);
 }
 
+.split-login-link a,
 .split-link {
-  color: #3b82f6;
-  font-weight: 700;
-}
-
-.split-link:hover {
-  color: #9333ea;
-  text-decoration: underline;
+  color: var(--primary-color);
+  font-weight: 600;
   cursor: pointer;
+  transition: color var(--transition-fast);
 }
 
-@media (min-width: 768px) {
-  .split-card {
-    flex-direction: row;
-  }
-
-  .split-branding {
-    width: 40%;
-    padding: 2rem;
-  }
-
-  .split-form-container {
-    width: 60%;
-    padding: 2rem;
-  }
-
-  .split-password-grid {
-    grid-template-columns: 1fr 1fr;
-  }
+.split-login-link a:hover,
+.split-link:hover {
+  color: var(--accent-color);
+  text-decoration: underline;
 }
 
-@media (max-width: 480px) {
-  .split-welcome-title {
-    font-size: 1.3rem;
-  }
-
-  .split-logo-image {
-    max-width: 60px;
-    max-height: 60px;
-  }
-
-  .split-logo-text {
-    font-size: 1.3rem;
-  }
-}
-
-/* Estilos para o seletor de tipo de usuário */
 .user-type-selector {
   display: flex;
-  gap: 1rem;
-  margin-top: 0.5rem;
+  gap: 0.75rem;
+  margin-top: 0.25rem;
 }
 
 .radio-option {
@@ -195,53 +209,75 @@
   align-items: center;
   gap: 0.5rem;
   cursor: pointer;
-  padding: 0.5rem 1rem;
-  border: 2px solid #e1e5e9;
-  border-radius: 8px;
-  transition: all 0.2s ease;
-  background: white;
+  padding: 0.625rem 1rem;
+  border: 1.5px solid var(--gray-200);
+  border-radius: var(--radius-sm);
+  transition: all var(--transition-fast);
+  background: var(--white);
+  flex: 1;
+  font-size: var(--text-sm);
 }
 
 .radio-option:hover {
-  border-color: #0066cc;
-  background: #f8f9fa;
+  border-color: var(--accent-color);
+  background: var(--gray-50);
 }
 
-.radio-option input[type="radio"]:checked + label,
 .radio-option:has(input[type="radio"]:checked) {
-  border-color: #0066cc;
-  background: #e6f3ff;
-  color: #0066cc;
-  font-weight: 500;
+  border-color: var(--primary-color);
+  background: var(--accent-muted);
+  color: var(--primary-color);
+  font-weight: 600;
 }
 
 .radio-option input[type="radio"] {
   margin: 0;
   cursor: pointer;
+  accent-color: var(--primary-color);
 }
 
-/* Estilo para campos específicos de empresa */
 .split-form-group small {
-  color: #6c757d;
-  font-size: 0.875rem;
+  color: var(--text-muted);
+  font-size: var(--text-xs);
   margin-top: 0.25rem;
   display: block;
 }
 
-/* Estilos para erros de validação */
-.error-text {
-  color: #ef4444;
-  font-size: 0.875rem;
-  margin-top: 4px;
+.error-text,
+.split-error-text {
+  color: var(--error);
+  font-size: var(--text-xs);
+  margin-top: 2px;
   display: block;
 }
 
 .input-error {
-  border-color: #ef4444 !important;
-  background-color: #fef2f2 !important;
+  border-color: var(--error) !important;
+  background-color: var(--error-bg) !important;
 }
 
 .input-error:focus {
   border-color: #dc2626 !important;
-  box-shadow: 0 0 0 3px rgba(239, 68, 68, 0.1) !important;
+  box-shadow: 0 0 0 3px rgba(239, 68, 68, 0.15) !important;
+}
+
+@media (min-width: 768px) {
+  .split-password-grid {
+    grid-template-columns: 1fr 1fr;
+  }
+}
+
+@media (max-width: 767px) {
+  .split-branding {
+    padding: 2rem 1.5rem;
+  }
+
+  .split-form-container {
+    padding: 1.5rem;
+  }
+
+  .split-logo-image {
+    max-width: 100px;
+    max-height: 60px;
+  }
 }

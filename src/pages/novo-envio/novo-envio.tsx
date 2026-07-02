@@ -15,7 +15,6 @@ import { useToast } from "../../context/toast-context";
 import { useFormValidation } from "../../hooks/useFormValidation";
 import { db } from "../../lib/firebaseConfig";
 import { getShipmentSchema } from "../../schemas/shipmentSchema";
-import { UserRole } from "../../types/user";
 import "./novo-envio.css";
 
 interface Cliente {
@@ -52,22 +51,16 @@ interface NovoEnvio {
 const NovoEnvioPage = () => {
   const navigate = useNavigate();
   const { addShipment } = useShipments();
-  const { currentUser, isStaff } = useAuth();
+  const { isStaff } = useAuth();
   const { isCollapsed } = useContext(NavbarContext);
   const { translations } = useLanguage();
   const { showError, showSuccess } = useToast();
 
   useEffect(() => {
-    const isStaffUser = isStaff();
-    const isCompanyUser = currentUser?.role === UserRole.COMPANY_USER;
-
-    if (!isStaffUser && !isCompanyUser) {
-      alert(
-        "Acesso negado. Apenas equipe operacional e usuários de empresa podem criar novos shipments."
-      );
+    if (!isStaff()) {
       navigate("/home");
     }
-  }, [isStaff, currentUser?.role, navigate]);
+  }, [isStaff, navigate]);
 
   const [formData, setFormData] = useState<NovoEnvio>({
     clienteId: "",
@@ -113,46 +106,24 @@ const NovoEnvioPage = () => {
     const fetchClientes = async () => {
       setLoadingClientes(true);
       try {
-        const isStaffUser = isStaff();
-
-        if (isStaffUser) {
-          // Admins see all non-admin users (companies)
-          const usersQuery = query(
-            collection(db, "users"),
-            where("role", "!=", "admin")
-          );
-          const snapshot = await getDocs(usersQuery);
-          const clientesData: Cliente[] = snapshot.docs.map((doc) => {
-            const data = doc.data();
-            return {
-              id: doc.id,
-              nome: data.displayName || data.name || "Usuário",
-              empresa: data.companyName || "-",
-              email: data.email || "-",
-              companyId: data.companyId || undefined,
-            };
-          });
-          setClientes(clientesData);
-          // Auto-select the current user's company if they're a company user
-          if (clientesData.length === 1) {
-            setFormData((prev) => ({ ...prev, clienteId: clientesData[0].id }));
-          }
-        } else {
-          // Company users only see their own company (represented by their current user)
-          if (currentUser) {
-            const clientesData: Cliente[] = [
-              {
-                id: currentUser.uid,
-                nome: currentUser.displayName || currentUser.email,
-                empresa: currentUser.companyName || "Minha Empresa",
-                email: currentUser.email,
-                companyId: currentUser.companyId,
-              },
-            ];
-            setClientes(clientesData);
-            // Auto-select their own company
-            setFormData((prev) => ({ ...prev, clienteId: clientesData[0].id }));
-          }
+        const usersQuery = query(
+          collection(db, "users"),
+          where("role", "==", "company_user")
+        );
+        const snapshot = await getDocs(usersQuery);
+        const clientesData: Cliente[] = snapshot.docs.map((doc) => {
+          const data = doc.data();
+          return {
+            id: doc.id,
+            nome: data.displayName || data.name || "Usuário",
+            empresa: data.companyName || "-",
+            email: data.email || "-",
+            companyId: data.companyId || undefined,
+          };
+        });
+        setClientes(clientesData);
+        if (clientesData.length === 1) {
+          setFormData((prev) => ({ ...prev, clienteId: clientesData[0].id }));
         }
       } catch (error) {
         console.error("Erro ao buscar clientes:", error);
@@ -162,7 +133,7 @@ const NovoEnvioPage = () => {
       }
     };
     fetchClientes();
-  }, [isStaff, currentUser]);
+  }, []);
 
   // Buscar operadores admins do Firestore
   useEffect(() => {
@@ -281,11 +252,8 @@ const NovoEnvioPage = () => {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
 
-    const isStaffUser = isStaff();
-    const isCompanyUser = currentUser?.role === UserRole.COMPANY_USER;
-
-    if (!isStaffUser && !isCompanyUser) {
-      showError("Erro: Você não tem permissão para criar shipments.");
+    if (!isStaff()) {
+      showError("Erro: Você não tem permissão para criar envios.");
       return;
     }
 
@@ -367,11 +335,7 @@ const NovoEnvioPage = () => {
     }
   };
 
-  const clienteSelecionado = clientes.find((c) => c.id === formData.clienteId);
-  const isStaffUser = isStaff();
-  const isCompanyUser = currentUser?.role === UserRole.COMPANY_USER;
-
-  if (!isStaffUser && !isCompanyUser) {
+  if (!isStaff()) {
     return (
       <main className="novo-envio-main">
         <Navbar />
@@ -384,8 +348,7 @@ const NovoEnvioPage = () => {
             <div className="access-denied">
               <h2>Acesso Negado</h2>
               <p>
-                Apenas administradores e usuários de empresa podem criar novos
-                shipments.
+                Apenas administradores e operadores podem criar novos envios.
               </p>
             </div>
           </div>
@@ -452,45 +415,28 @@ const NovoEnvioPage = () => {
               </div>
 
               <div className="form-row">
-                {isStaffUser && (
-                  <div className="form-group">
-                    <label htmlFor="clienteId">Cliente *</label>
-                    <select
-                      id="clienteId"
-                      name="clienteId"
-                      value={formData.clienteId}
-                      onChange={handleInputChange}
-                      required
-                      disabled={loadingClientes}
-                    >
-                      <option value="">
-                        {loadingClientes
-                          ? translations.loading
-                          : translations.selectClient}
+                <div className="form-group">
+                  <label htmlFor="clienteId">Cliente *</label>
+                  <select
+                    id="clienteId"
+                    name="clienteId"
+                    value={formData.clienteId}
+                    onChange={handleInputChange}
+                    required
+                    disabled={loadingClientes}
+                  >
+                    <option value="">
+                      {loadingClientes
+                        ? translations.loading
+                        : translations.selectClient}
+                    </option>
+                    {clientes.map((cliente) => (
+                      <option key={cliente.id} value={cliente.id}>
+                        {cliente.nome} - {cliente.empresa}
                       </option>
-                      {clientes.map((cliente) => (
-                        <option key={cliente.id} value={cliente.id}>
-                          {cliente.nome} - {cliente.empresa}
-                        </option>
-                      ))}
-                    </select>
-                  </div>
-                )}
-
-                {isCompanyUser && clienteSelecionado && (
-                  <div className="form-group">
-                    <label>Sua Empresa</label>
-                    <input
-                      type="text"
-                      value={clienteSelecionado.empresa}
-                      disabled
-                      style={{
-                        backgroundColor: "#f0f0f0",
-                        cursor: "not-allowed",
-                      }}
-                    />
-                  </div>
-                )}
+                    ))}
+                  </select>
+                </div>
 
                 <div className="form-group">
                   <label htmlFor="operador">Operador *</label>

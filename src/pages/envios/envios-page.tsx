@@ -17,7 +17,7 @@ import { useShipments } from "../../context/shipments-context";
 import "./envios-page.css";
 
 export const EnviosPage = () => {
-  const { isAdmin, isStaff } = useAuth();
+  const { canImportShipments, isStaff } = useAuth();
   const { isCollapsed } = useContext(NavbarContext);
   const [searchParams] = useSearchParams();
   const [activeFilters, setActiveFilters] = useState({
@@ -78,7 +78,7 @@ export const EnviosPage = () => {
           </div>
         )}
 
-        {isAdmin() && (
+        {canImportShipments() && (
           <div className="excel-controls">
             <div className="excel-controls-header">
               <h3>
@@ -98,7 +98,7 @@ export const EnviosPage = () => {
           </div>
         )}
 
-        {isAdmin() && (
+        {canImportShipments() && (
           <div className="excel-controls">
             <div className="excel-controls-header">
               <h3>

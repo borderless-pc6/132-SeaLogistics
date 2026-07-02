@@ -87,6 +87,16 @@ service cloud.firestore {
       allow write: if isAdmin();
     }
 
+    // Notificações in-app (Firebase push + histórico no painel)
+    match /notifications/{notificationId} {
+      allow read: if isAuthenticated() &&
+        resource.data.userId == request.auth.uid;
+      allow create: if isStaff();
+      allow update: if isAuthenticated() &&
+        resource.data.userId == request.auth.uid;
+      allow delete: if isAdmin();
+    }
+
     // Regras para a coleção de documentos
     match /documents/{documentId} {
       // Staff pode ler/escrever qualquer documento

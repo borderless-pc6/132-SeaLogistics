@@ -1,12 +1,59 @@
 .shipping-table-container {
-  padding: 16px;
-  background: #f8f9fa;
+  padding: 0;
+  background: transparent;
   min-height: auto;
   position: relative;
   overflow: visible;
   isolation: isolate;
   z-index: 1;
-  transform: translateZ(0);
+}
+
+.shipping-table-title {
+  font-size: var(--text-2xl);
+  font-weight: 700;
+  color: var(--text-primary);
+  margin: 0 0 var(--space-md) 0;
+  letter-spacing: -0.02em;
+}
+
+.export-all-button {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 18px;
+  background: linear-gradient(135deg, var(--primary-color) 0%, var(--primary-light) 100%);
+  color: white;
+  border: none;
+  border-radius: var(--radius-sm);
+  font-size: var(--text-sm);
+  font-weight: 600;
+  cursor: pointer;
+  transition: all var(--transition-fast);
+  box-shadow: 0 2px 8px rgba(30, 77, 71, 0.25);
+}
+
+.export-all-button:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 4px 14px rgba(30, 77, 71, 0.35);
+}
+
+.table-wrapper {
+  width: 100%;
+  overflow-x: auto;
+  overflow-y: visible;
+  border-radius: var(--radius-lg);
+  min-height: 200px;
+  background: var(--bg-card);
+  box-shadow: var(--shadow-sm);
+  border: 1px solid var(--border-color);
+  position: relative;
+}
+
+.shipping-table {
+  width: 100%;
+  border-collapse: collapse;
+  min-height: 180px;
+  table-layout: fixed;
 }
 
 .shipping-table-header {
@@ -15,128 +62,42 @@
   align-items: center;
   flex-wrap: wrap;
   gap: 12px;
-  margin-bottom: 16px;
-}
-
-.shipping-table-title {
-  font-size: 24px;
-  font-weight: 700;
-  color: #2c3e50;
-  margin: 0 0 12px 0;
-}
-
-.export-all-button {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  padding: 10px 16px;
-  background: linear-gradient(
-    135deg,
-    var(--primary-color) 0%,
-    var(--secondary-color) 100%
-  );
-  color: white;
-  border: none;
-  border-radius: 8px;
-  font-size: 14px;
-  font-weight: 600;
-  cursor: pointer;
-  transition: all 0.3s ease;
-  box-shadow: 0 2px 8px rgba(49, 88, 81, 0.2);
-}
-
-.export-all-button:hover {
-  transform: translateY(-2px);
-  box-shadow: 0 4px 12px rgba(49, 88, 81, 0.3);
-}
-
-.export-all-button:active {
-  transform: translateY(0);
-}
-
-.export-all-button:disabled {
-  opacity: 0.6;
-  cursor: not-allowed;
-  transform: none;
-}
-
-.table-wrapper {
-  width: 100%;
-  overflow-x: auto;
-  overflow-y: visible;
-  border-radius: 12px;
-  min-height: 200px;
-  background: white;
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
-  border: 1px solid rgba(0, 0, 0, 0.05);
-  position: relative;
-  isolation: isolate;
-  z-index: 1;
-  transform: translateZ(0);
-}
-
-.shipping-table {
-  width: 100%;
-  border-collapse: collapse;
-  min-height: 180px;
-  position: relative;
-  table-layout: fixed;
-}
-
-.shipping-table tbody {
-  min-height: 100px;
+  margin-bottom: var(--space-md);
 }
 
 .shipping-table tbody tr {
-  min-height: 36px;
-  transition: all 0.2s ease;
+  transition: background-color var(--transition-fast);
   cursor: pointer;
-}
-
-.shipping-table tbody tr:last-child {
-  border-bottom: none;
 }
 
 .shipping-table tbody tr:nth-child(even) {
-  background-color: rgba(49, 88, 81, 0.03);
-}
-
-.shipping-table tbody tr {
-  transition: background-color 0.2s ease, transform 0.2s ease;
+  background-color: var(--gray-50);
 }
 
 .shipping-table tbody tr:hover {
-  background-color: #f0f8ff;
-  transform: scale(1.01);
-  transform: translateY(-1px);
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
-}
-
-.shipping-table tbody tr:active {
-  transform: translateY(0);
-  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.1);
+  background-color: var(--accent-muted);
 }
 
 .shipping-table th,
 .shipping-table td {
-  padding: 14px 12px;
+  padding: 12px 14px;
   text-align: left;
   vertical-align: middle;
-  border-bottom: 1px solid #e9ecef;
-  font-size: 13px;
-  box-sizing: border-box;
-  position: relative;
-  z-index: 1;
+  border-bottom: 1px solid var(--border-color);
+  font-size: var(--text-sm);
 }
 
 .shipping-table th {
-  background: #008080;
+  background: var(--primary-color);
   color: white;
   font-weight: 600;
-  font-size: 12px;
+  font-size: var(--text-xs);
   text-transform: uppercase;
-  letter-spacing: 0.3px;
-  padding: 12px 12px;
+  letter-spacing: 0.05em;
+  padding: 14px;
+  position: sticky;
+  top: 0;
+  z-index: 2;
 }
 
 .shipping-table td {

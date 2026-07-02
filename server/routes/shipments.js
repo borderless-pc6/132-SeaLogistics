@@ -70,7 +70,7 @@ router.get("/:id", async (req, res) => {
   }
 });
 
-router.post("/", requireRole("admin", "operator", "company_user"), async (req, res) => {
+router.post("/", requireRole("admin", "operator"), async (req, res) => {
   try {
     if (!isFirebaseAdminReady()) {
       return res.status(503).json({ success: false, error: "Firebase Admin não configurado" });
@@ -80,17 +80,13 @@ router.post("/", requireRole("admin", "operator", "company_user"), async (req, r
     const data = { ...req.body };
     delete data.id;
 
-    if (req.user.role === "company_user") {
-      data.companyId = req.user.companyId;
-    }
-
     data.createdAt = new Date();
     data.updatedAt = new Date();
 
     const docRef = await db.collection("shipments").add(data);
     const shipment = { id: docRef.id, ...data };
 
-    let notifications = { email: false, whatsapp: false };
+    let notifications = { email: false, push: false };
     try {
       notifications = await sendClientShipmentNotification(shipment);
     } catch (notifyError) {
@@ -199,7 +195,7 @@ router.patch("/:id/status", requireRole("admin", "operator", "company_user"), as
     });
 
     const updatedShipment = { id: req.params.id, ...existingData, ...updates };
-    let notifications = { email: false, whatsapp: false };
+    let notifications = { email: false, push: false };
     if (existingData.status !== status) {
       try {
         notifications = await sendClientStatusUpdateNotification(

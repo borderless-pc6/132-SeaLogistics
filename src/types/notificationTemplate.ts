@@ -2,6 +2,11 @@ export type NotificationTemplateId =
   | "new_shipment_email"
   | "status_update_email"
   | "jabil_shipment_email"
+  | "new_shipment_push"
+  | "status_update_push"
+  | "tracking_push"
+  | "jabil_shipment_push"
+  /** @deprecated Templates legados — use variantes _push */
   | "new_shipment_whatsapp"
   | "status_update_whatsapp"
   | "tracking_whatsapp"

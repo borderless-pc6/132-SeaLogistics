@@ -173,24 +173,12 @@ export const ShipmentsProvider: React.FC<ShipmentsProviderProps> = ({
 
       const isAdmin_ = isAdmin();
       const isOperator_ = currentUser.role === UserRole.OPERATOR;
-      const isCompanyUser_ = currentUser.role === UserRole.COMPANY_USER;
 
-      if (!isAdmin_ && !isOperator_ && !isCompanyUser_) {
+      if (!isAdmin_ && !isOperator_) {
         throw new Error("Você não tem permissão para criar novos shipments");
       }
 
-      let companyIdToUse = shipmentData.companyId;
-
-      if (isCompanyUser_) {
-        // Company users must use their own companyId
-        if (
-          shipmentData.companyId &&
-          shipmentData.companyId !== currentUser.companyId
-        ) {
-          throw new Error("Você só pode criar envios para sua própria empresa");
-        }
-        companyIdToUse = currentUser.companyId;
-      }
+      const companyIdToUse = shipmentData.companyId;
 
       const shipmentWithCompany: Record<string, unknown> = {
         ...shipmentData,
@@ -224,7 +212,7 @@ export const ShipmentsProvider: React.FC<ShipmentsProviderProps> = ({
         console.error("Erro ao registrar histórico de criação:", historyError);
       }
 
-      // Notificar cliente final (email + WhatsApp da empresa)
+      // Notificar cliente final (email + push)
       if (companyIdToUse) {
         try {
           await sendClientShipmentNotification({
@@ -342,18 +330,12 @@ export const ShipmentsProvider: React.FC<ShipmentsProviderProps> = ({
 
     if (isAdmin() || currentUser.role === UserRole.OPERATOR) return true;
 
-    if (currentUser.role === UserRole.COMPANY_USER) {
-      return shipment.companyId === currentUser.companyId;
-    }
-
     return false;
   };
 
   const canCreateShipment = (): boolean => {
     return (
-      isAdmin() ||
-      currentUser?.role === UserRole.OPERATOR ||
-      currentUser?.role === UserRole.COMPANY_USER
+      isAdmin() || currentUser?.role === UserRole.OPERATOR
     );
   };
 

@@ -6,7 +6,7 @@ export interface CarrierSimulationResult {
   oldStatus: string;
   newStatus: string;
   carrierMessage: string;
-  notifications?: { email: boolean; whatsapp: boolean };
+  notifications?: { email: boolean; push: boolean };
 }
 
 export interface CarrierBatchResponse {
@@ -28,7 +28,7 @@ export interface CarrierSingleResponse {
     carrierName: string;
   };
   oldStatus?: string;
-  notifications?: { email: boolean; whatsapp: boolean };
+  notifications?: { email: boolean; push: boolean };
   reason?: string;
   error?: string;
 }

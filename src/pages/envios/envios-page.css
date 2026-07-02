@@ -1,220 +1,161 @@
 .envios-container {
   display: flex;
   min-height: 100vh;
-  background-color: #f5f7fa;
+  background-color: var(--bg-page);
   position: relative;
-  overflow: hidden;
 }
 
 .envios-content {
   flex: 1;
   margin-left: var(--page-content-offset);
-  padding: 20px;
+  padding: var(--space-lg);
   overflow-y: auto;
-  transition: margin-left 0.3s ease;
+  transition: margin-left var(--transition-base);
   box-sizing: border-box;
   min-height: 100vh;
   position: relative;
   z-index: 1;
-  padding-bottom: 100px; /* Espaço para o footer */
+  padding-bottom: 100px;
 }
-/* Filtros Ativos */
+
 .active-filters {
-  background: white;
-  border-radius: 12px;
-  padding: 20px;
-  margin-bottom: 20px;
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
-  border: 1px solid rgba(0, 0, 0, 0.05);
-  position: relative;
-  z-index: 2;
+  background: var(--bg-card);
+  border-radius: var(--radius-lg);
+  padding: var(--space-md) var(--space-lg);
+  margin-bottom: var(--space-md);
+  box-shadow: var(--shadow-sm);
+  border: 1px solid var(--border-color);
 }
 
 .active-filters h3 {
-  color: var(--secondary-color, #305951);
-  font-size: 18px;
+  color: var(--text-primary);
+  font-size: var(--text-sm);
   font-weight: 600;
-  margin: 0 0 16px 0;
+  margin: 0 0 var(--space-sm) 0;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
 }
 
 .filter-tags {
   display: flex;
-  gap: 12px;
+  gap: var(--space-sm);
   flex-wrap: wrap;
 }
 
 .filter-tag {
-  background: var(--primary-color, #789170);
-  color: white;
-  padding: 8px 16px;
-  border-radius: 20px;
-  font-size: 14px;
-  font-weight: 500;
-  display: flex;
+  background: var(--accent-muted);
+  color: var(--primary-color);
+  padding: 6px 14px;
+  border-radius: var(--radius-full);
+  font-size: var(--text-xs);
+  font-weight: 600;
+  display: inline-flex;
   align-items: center;
-  gap: 8px;
+  gap: 6px;
+  border: 1px solid rgba(61, 186, 140, 0.2);
 }
 
 .filter-tag::before {
   content: "✓";
-  font-weight: bold;
+  font-size: 10px;
 }
 
-/* Responsividade */
-@media (max-width: 768px) {
-  .envios-content {
-    padding: 16px;
-  }
-  
-  .active-filters {
-    padding: 16px;
-  }
-  
-  .filter-tags {
-    gap: 8px;
-  }
-  
-  .filter-tag {
-    font-size: 12px;
-    padding: 6px 12px;
-  }
-}
-
-@media (max-width: 480px) {
-  .envios-content {
-    padding: 12px;
-  }
-}
-
-/* Melhorar o espaçamento interno da tabela */
-.envios-content .shipping-table-container {
-  margin: 0;
-  background: transparent;
-  box-shadow: none;
-  border-radius: 0;
-}
-
-.envios-content .shipping-table-title {
-  color: var(--primary-color);
-  margin-bottom: 2rem;
-  font-size: 2rem;
-  font-weight: 700;
-  text-align: left;
-}
-
-/* Estilizar os filtros */
-.envios-content .shipping-filters {
-  background: #f8f9fa;
-  border: 1px solid #e9ecef;
-  margin-bottom: 2rem;
-}
-
-/* Controles do Excel */
 .excel-controls {
-  background: white;
-  border-radius: 12px;
-  padding: 20px;
-  margin-bottom: 20px;
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
-  border: 1px solid rgba(0, 0, 0, 0.05);
+  background: var(--bg-card);
+  border-radius: var(--radius-lg);
+  padding: var(--space-md) var(--space-lg);
+  margin-bottom: var(--space-md);
+  box-shadow: var(--shadow-sm);
+  border: 1px solid var(--border-color);
+  transition: box-shadow var(--transition-base);
+}
+
+.excel-controls:hover {
+  box-shadow: var(--shadow-md);
 }
 
 .excel-controls-header {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  margin-bottom: 16px;
+  gap: var(--space-md);
 }
 
 .excel-controls-header h3 {
-  color: var(--secondary-color, #305951);
-  font-size: 18px;
+  color: var(--text-primary);
+  font-size: var(--text-base);
   font-weight: 600;
   margin: 0;
+  display: flex;
+  align-items: center;
+  gap: var(--space-sm);
+}
+
+.excel-controls-header h3 svg {
+  color: var(--accent-color);
 }
 
 .excel-toggle-btn {
-  background: var(--primary-color, #789170);
-  color: white;
-  border: none;
-  padding: 10px 20px;
-  border-radius: 8px;
-  font-size: 14px;
-  font-weight: 500;
+  background: var(--gray-100);
+  color: var(--text-primary);
+  border: 1px solid var(--border-color);
+  padding: 8px 16px;
+  border-radius: var(--radius-sm);
+  font-size: var(--text-sm);
+  font-weight: 600;
   cursor: pointer;
-  transition: all 0.2s;
+  transition: all var(--transition-fast);
+  flex-shrink: 0;
 }
 
 .excel-toggle-btn:hover {
-  background: var(--secondary-color, #305951);
-  transform: translateY(-1px);
+  background: var(--gray-200);
+  border-color: var(--border-color-strong);
 }
 
 .excel-toggle-btn.active {
-  background: var(--secondary-color, #305951);
+  background: var(--primary-color);
+  color: var(--white);
+  border-color: var(--primary-color);
 }
 
-/* Melhorar a tabela */
-.envios-content .shipping-table th {
-  background-color: var(--primary-color);
-  color: white;
+.envios-content .shipping-table-container {
+  margin: 0;
+  background: transparent;
+  box-shadow: none;
+  border-radius: 0;
+  padding: 0;
 }
 
-.envios-content .shipping-table tr:nth-child(even) {
-  background-color: rgba(49, 88, 81, 0.05);
+.envios-content .shipping-table-title {
+  color: var(--text-primary);
+  margin-bottom: var(--space-lg);
+  font-size: var(--text-3xl);
+  font-weight: 700;
+  letter-spacing: -0.02em;
 }
 
-.envios-content .shipping-table tr:hover {
-  background-color: rgba(49, 88, 81, 0.1);
+.envios-content .shipping-filters {
+  background: var(--bg-card);
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-lg);
+  margin-bottom: var(--space-lg);
+  box-shadow: var(--shadow-sm);
 }
 
-/* Botões de ação com nova cor de destaque */
-.envios-content .action-icon.check-icon {
-  color: #ffffff;
-  background: #28a745;
-  border: 1px solid #28a745;
+@media (max-width: 768px) {
+  .envios-content {
+    padding: var(--space-md);
+  }
+
+  .excel-controls-header {
+    flex-direction: column;
+    align-items: flex-start;
+  }
 }
 
-.envios-content .action-icon.check-icon:hover:not(:disabled) {
-  background: #218838;
-  border-color: #1e7e34;
-  color: #ffffff;
-}
-
-.envios-content .action-icon.edit-icon {
-  color: #ffffff;
-  background: #007bff;
-  border: 1px solid #007bff;
-}
-
-.envios-content .action-icon.edit-icon:hover:not(:disabled) {
-  background: #0056b3;
-  border-color: #004085;
-  color: #ffffff;
-}
-
-/* Estilo para o botão de documentos */
-.envios-content .action-icon.documents-icon {
-  color: #ffffff;
-  background: #fd7e14;
-  border: 1px solid #fd7e14;
-}
-
-.envios-content .action-icon.documents-icon:hover:not(:disabled) {
-  background: #e55a00;
-  border-color: #cc4c00;
-  color: #ffffff;
-}
-
-/* Estilo para o ícone de documento/arquivo (exportar Excel) */
-.envios-content .action-icon.file-icon {
-  color: #ffffff;
-  background: #6f42c1;
-  border: 1px solid #6f42c1;
-}
-
-.envios-content .action-icon.file-icon:hover:not(:disabled) {
-  background: #5a32a3;
-  border-color: #4c2d8a;
-  color: #ffffff;
+@media (max-width: 480px) {
+  .envios-content {
+    padding: var(--space-sm) var(--space-md);
+  }
 }

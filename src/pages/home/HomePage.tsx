@@ -6,7 +6,12 @@ export const HomePage = () => {
     const { isAdmin, isOperator, loading } = useAuth();
 
     if (loading) {
-        return <div>Carregando...</div>;
+        return (
+            <div className="page-loading">
+                <div className="page-loading__spinner" />
+                <p>Carregando...</p>
+            </div>
+        );
     }
 
     if (isAdmin()) {

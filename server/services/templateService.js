@@ -87,6 +87,27 @@ Localização: {{currentLocation}}
 
 _Sea Logistics International_`,
   },
+  new_shipment_push: {
+    id: "new_shipment_push",
+    body: `🚢 Novo envio registrado — BL {{numeroBl}}
+
+Cliente: {{cliente}}
+Rota: {{pol}} → {{pod}}
+ETD: {{etdOrigem}} | ETA: {{etaDestino}}
+Status: {{status}}
+
+Sea Logistics`,
+  },
+  status_update_push: {
+    id: "status_update_push",
+    body: `🔔 Status atualizado — BL {{numeroBl}}
+
+{{cliente}}: {{oldStatus}} → {{status}}
+Rota: {{pol}} → {{pod}}
+Localização: {{currentLocation}}
+
+Sea Logistics`,
+  },
 };
 
 function getStatusLabel(status) {
@@ -153,7 +174,15 @@ async function renderEmailTemplate(templateId, shipment, extra = {}) {
 }
 
 async function renderWhatsAppTemplate(templateId, shipment, extra = {}) {
-  const template = await getTemplate(templateId);
+  return renderPushTemplate(templateId, shipment, extra);
+}
+
+async function renderPushTemplate(templateId, shipment, extra = {}) {
+  const pushId = templateId.replace("_whatsapp", "_push");
+  let template = await getTemplate(pushId);
+  if (!template) {
+    template = await getTemplate(templateId);
+  }
   if (!template) {
     throw new Error(`Template ${templateId} não encontrado`);
   }
@@ -164,5 +193,6 @@ async function renderWhatsAppTemplate(templateId, shipment, extra = {}) {
 module.exports = {
   renderEmailTemplate,
   renderWhatsAppTemplate,
+  renderPushTemplate,
   getStatusLabel,
 };

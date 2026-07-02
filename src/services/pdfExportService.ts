@@ -40,11 +40,13 @@ interface PDFExportOptions {
   shipments?: Shipment[];
   charts?: boolean;
   language?: "pt" | "en" | "es";
+  fileName?: string;
 }
 
 const translations = {
   pt: {
     reportTitle: "Relatório de Dashboard",
+    shipmentsReportTitle: "Relatório de Embarques",
     generatedOn: "Gerado em",
     statistics: "Estatísticas",
     totalShipments: "Total de Envios",
@@ -68,6 +70,7 @@ const translations = {
   },
   en: {
     reportTitle: "Dashboard Report",
+    shipmentsReportTitle: "Shipments Report",
     generatedOn: "Generated on",
     statistics: "Statistics",
     totalShipments: "Total Shipments",
@@ -91,6 +94,7 @@ const translations = {
   },
   es: {
     reportTitle: "Informe del Panel",
+    shipmentsReportTitle: "Informe de Embarques",
     generatedOn: "Generado el",
     statistics: "Estadísticas",
     totalShipments: "Total de Envíos",
@@ -115,8 +119,9 @@ const translations = {
 };
 
 export const exportDashboardToPDF = async (options: PDFExportOptions) => {
-  const { title, stats, shipments, language = "pt" } = options;
+  const { title, stats, shipments, language = "pt", fileName } = options;
   const t = translations[language];
+  const reportTitle = title || t.reportTitle;
 
   const doc = new jsPDF();
   let yPosition = 20;
@@ -124,7 +129,7 @@ export const exportDashboardToPDF = async (options: PDFExportOptions) => {
   // Cabeçalho
   doc.setFontSize(20);
   doc.setTextColor(48, 57, 80); // #2c3e50
-  doc.text(t.reportTitle, 14, yPosition);
+  doc.text(reportTitle, 14, yPosition);
   yPosition += 10;
 
   doc.setFontSize(10);
@@ -140,7 +145,16 @@ export const exportDashboardToPDF = async (options: PDFExportOptions) => {
     }
   );
   doc.text(`${t.generatedOn}: ${currentDate}`, 14, yPosition);
-  yPosition += 15;
+  yPosition += 10;
+
+  if (!stats && shipments && shipments.length > 0) {
+    doc.setFontSize(11);
+    doc.setTextColor(48, 57, 80);
+    doc.text(`${t.totalShipments}: ${shipments.length}`, 14, yPosition);
+    yPosition += 10;
+  } else {
+    yPosition += 5;
+  }
 
   // Estatísticas
   if (stats) {
@@ -316,9 +330,23 @@ export const exportDashboardToPDF = async (options: PDFExportOptions) => {
   }
 
   // Salvar PDF
-  const fileName = `relatorio-dashboard-${new Date().toISOString().split("T")[0]}.pdf`;
-  doc.save(fileName);
+  const defaultFileName = stats
+    ? `relatorio-dashboard-${new Date().toISOString().split("T")[0]}.pdf`
+    : `relatorio-embarques-${new Date().toISOString().split("T")[0]}.pdf`;
+  doc.save(fileName || defaultFileName);
 };
+
+export async function exportShipmentsReportToPDF(
+  shipments: Shipment[],
+  language: "pt" | "en" | "es" = "pt"
+): Promise<void> {
+  const t = translations[language];
+  await exportDashboardToPDF({
+    title: t.shipmentsReportTitle,
+    shipments,
+    language,
+  });
+}
 
 export default exportDashboardToPDF;
 

@@ -1,79 +1,18 @@
-import { doc, getDoc } from "firebase/firestore";
+import { sendEmail } from "./emailService";
+import { apiFetch } from "./authApi";
 import type { Shipment } from "../context/shipments-context";
-import { db } from "../lib/firebaseConfig";
 import type { NotificationPreferences } from "../types/user";
 import { resolveCompanyClientContact } from "./clientContactService";
-import { sendEmail } from "./emailService";
-import { renderEmailTemplate, renderWhatsAppTemplate } from "./templateService";
-import { sendWhatsAppMessage, formatPhoneNumber } from "./whatsappService";
+import { renderEmailTemplate } from "./templateService";
 
 export type { CompanyClientContact } from "./clientContactService";
 export { resolveCompanyClientContact } from "./clientContactService";
 
-// Número de WhatsApp de teste (sandbox Twilio) quando o cliente não tem telefone cadastrado
-const rawTestPhone = import.meta.env.VITE_WHATSAPP_TEST_PHONE;
-const TEST_WHATSAPP_PHONE = (() => {
-  if (typeof rawTestPhone !== "string" || !rawTestPhone.trim()) return undefined;
-  const digits = rawTestPhone.replace(/\D/g, "");
-  if (digits.length < 10) return undefined;
-  return digits.startsWith("55") ? digits : `55${digits}`;
-})();
-
-const getUserNotificationPreferences = async (
-  userId: string
-): Promise<NotificationPreferences> => {
-  try {
-    const userDoc = await getDoc(doc(db, "users", userId));
-
-    if (userDoc.exists()) {
-      const userData = userDoc.data();
-
-      if (userData.notificationPreferences) {
-        return userData.notificationPreferences;
-      }
-
-      if (userData.notifications) {
-        return {
-          email: userData.notifications.email ?? true,
-          whatsapp: userData.notifications.whatsapp ?? false,
-          statusUpdates: userData.notifications.statusUpdates ?? true,
-          newShipments: userData.notifications.newShipments ?? true,
-        };
-      }
-    }
-
-    return {
-      email: true,
-      whatsapp: false,
-      statusUpdates: true,
-      newShipments: true,
-    };
-  } catch (error) {
-    console.error("Erro ao buscar preferências de notificação:", error);
-    return {
-      email: true,
-      whatsapp: false,
-      statusUpdates: true,
-      newShipments: true,
-    };
-  }
-};
-
-const getUserWhatsAppNumber = async (userId: string): Promise<string | null> => {
-  try {
-    const userDoc = await getDoc(doc(db, "users", userId));
-
-    if (userDoc.exists()) {
-      const userData = userDoc.data();
-      return userData.whatsappPhone || userData.phone || null;
-    }
-
-    return null;
-  } catch (error) {
-    console.error("Erro ao buscar número de WhatsApp:", error);
-    return null;
-  }
-};
+function normalizePushPreference(prefs: NotificationPreferences): boolean {
+  if (prefs.push !== undefined) return prefs.push;
+  if (prefs.whatsapp !== undefined) return prefs.whatsapp;
+  return true;
+}
 
 export const sendShipmentCreatedEmail = async (
   shipment: Shipment,
@@ -109,63 +48,54 @@ export const sendStatusUpdateEmail = async (
   });
 };
 
+async function notifyViaBackend(
+  path: string,
+  body: Record<string, unknown>
+): Promise<{ email: boolean; push: boolean } | null> {
+  try {
+    const response = await apiFetch(path, {
+      method: "POST",
+      body: JSON.stringify(body),
+    });
+    if (!response.ok) return null;
+    const data = await response.json();
+    return data.notifications || { email: false, push: false };
+  } catch {
+    return null;
+  }
+}
+
 /**
  * Notifica o cliente final (empresa do embarque) sobre novo envio.
- * Usa contactEmail/phone da collection companies no Firebase.
  */
 export const sendClientShipmentNotification = async (
   shipment: Shipment
-): Promise<{ email: boolean; whatsapp: boolean }> => {
-  const results = { email: false, whatsapp: false };
+): Promise<{ email: boolean; push: boolean }> => {
+  const backendResult = await notifyViaBackend("/api/notifications/shipment-created", {
+    shipment,
+  });
+  if (backendResult) return backendResult;
+
+  const results = { email: false, push: false };
 
   if (!shipment.companyId) {
-    console.warn(
-      "[Notificação Cliente] Embarque sem companyId — notificação ignorada"
-    );
+    console.warn("[Notificação Cliente] Embarque sem companyId");
     return results;
   }
 
   const contact = await resolveCompanyClientContact(shipment.companyId);
-  if (!contact) {
-    console.warn(
-      "[Notificação Cliente] Empresa não encontrada:",
-      shipment.companyId
-    );
-    return results;
-  }
-
-  if (!contact.preferences.newShipments) {
-    console.log(
-      `[Notificação Cliente] ${contact.companyName} desabilitou novos envios`
-    );
+  if (!contact || !contact.preferences.newShipments) {
     return results;
   }
 
   if (contact.preferences.email && contact.email) {
-    console.log(
-      `[Notificação Cliente] Email novo envio → ${contact.email}`
-    );
     results.email = await sendShipmentCreatedEmail(shipment, contact.email);
-  } else if (contact.preferences.email && !contact.email) {
-    console.warn(
-      `[Notificação Cliente] ${contact.companyName} sem email cadastrado`
-    );
   }
 
-  const whatsappNumber = contact.phone || TEST_WHATSAPP_PHONE;
-  if ((contact.preferences.whatsapp || TEST_WHATSAPP_PHONE) && whatsappNumber) {
-    const message = await renderWhatsAppTemplate(
-      "new_shipment_whatsapp",
-      shipment
-    );
+  if (normalizePushPreference(contact.preferences)) {
     console.log(
-      "[Notificação Cliente] WhatsApp novo envio →",
-      whatsappNumber.replace(/(\d{4})\d+(\d{2})/, "$1****$2")
+      `[Notificação Cliente] Push novo envio → ${contact.companyName} (requer backend FCM)`
     );
-    results.whatsapp = await sendWhatsAppMessage({
-      to: formatPhoneNumber(whatsappNumber),
-      message,
-    });
   }
 
   return results;
@@ -177,155 +107,58 @@ export const sendClientShipmentNotification = async (
 export const sendClientStatusUpdateNotification = async (
   shipment: Shipment,
   oldStatus: string
-): Promise<{ email: boolean; whatsapp: boolean }> => {
-  const results = { email: false, whatsapp: false };
+): Promise<{ email: boolean; push: boolean }> => {
+  const backendResult = await notifyViaBackend("/api/notifications/status-updated", {
+    shipment,
+    oldStatus,
+  });
+  if (backendResult) return backendResult;
+
+  const results = { email: false, push: false };
 
   if (!shipment.companyId) {
-    console.warn(
-      "[Notificação Cliente] Embarque sem companyId — notificação ignorada"
-    );
     return results;
   }
 
   const contact = await resolveCompanyClientContact(shipment.companyId);
-  if (!contact) {
-    console.warn(
-      "[Notificação Cliente] Empresa não encontrada:",
-      shipment.companyId
-    );
-    return results;
-  }
-
-  if (!contact.preferences.statusUpdates) {
-    console.log(
-      `[Notificação Cliente] ${contact.companyName} desabilitou atualizações de status`
-    );
+  if (!contact || !contact.preferences.statusUpdates) {
     return results;
   }
 
   if (contact.preferences.email && contact.email) {
-    console.log(
-      `[Notificação Cliente] Email status → ${contact.email} (${oldStatus} → ${shipment.status})`
-    );
     results.email = await sendStatusUpdateEmail(
       shipment,
       contact.email,
       oldStatus
     );
-  } else if (contact.preferences.email && !contact.email) {
-    console.warn(
-      `[Notificação Cliente] ${contact.companyName} sem email cadastrado`
-    );
   }
 
-  const whatsappNumber = contact.phone || TEST_WHATSAPP_PHONE;
-  if ((contact.preferences.whatsapp || TEST_WHATSAPP_PHONE) && whatsappNumber) {
-    const message = await renderWhatsAppTemplate(
-      "status_update_whatsapp",
-      shipment,
-      { oldStatus }
-    );
+  if (normalizePushPreference(contact.preferences)) {
     console.log(
-      "[Notificação Cliente] WhatsApp status →",
-      whatsappNumber.replace(/(\d{4})\d+(\d{2})/, "$1****$2")
-    );
-    results.whatsapp = await sendWhatsAppMessage({
-      to: formatPhoneNumber(whatsappNumber),
-      message,
-    });
-  } else if (contact.preferences.whatsapp && !whatsappNumber) {
-    console.warn(
-      `[Notificação Cliente] ${contact.companyName} sem telefone WhatsApp cadastrado`
+      `[Notificação Cliente] Push status → ${contact.companyName} (requer backend FCM)`
     );
   }
 
   return results;
 };
 
-/** @deprecated Prefer sendClientShipmentNotification — notifica operador logado */
+/** @deprecated Prefer sendClientShipmentNotification */
 export const sendShipmentNotification = async (
   shipment: Shipment,
-  userId: string,
-  clientEmail?: string,
-  clientPhone?: string
-): Promise<{ email: boolean; whatsapp: boolean }> => {
-  if (shipment.companyId) {
-    return sendClientShipmentNotification(shipment);
-  }
-
-  const results = { email: false, whatsapp: false };
-  const preferences = await getUserNotificationPreferences(userId);
-
-  if (!preferences.newShipments) return results;
-
-  if (preferences.email && clientEmail) {
-    results.email = await sendShipmentCreatedEmail(shipment, clientEmail);
-  }
-
-  if (preferences.whatsapp || TEST_WHATSAPP_PHONE) {
-    const whatsappNumber =
-      clientPhone ||
-      (await getUserWhatsAppNumber(userId)) ||
-      TEST_WHATSAPP_PHONE;
-
-    if (whatsappNumber) {
-      const message = await renderWhatsAppTemplate(
-        "new_shipment_whatsapp",
-        shipment
-      );
-      results.whatsapp = await sendWhatsAppMessage({
-        to: formatPhoneNumber(whatsappNumber),
-        message,
-      });
-    }
-  }
-
-  return results;
+  _userId: string,
+  _clientEmail?: string,
+  _clientPhone?: string
+): Promise<{ email: boolean; push: boolean }> => {
+  return sendClientShipmentNotification(shipment);
 };
 
-/** @deprecated Prefer sendClientStatusUpdateNotification — notifica operador logado */
+/** @deprecated Prefer sendClientStatusUpdateNotification */
 export const sendStatusUpdateNotification = async (
   shipment: Shipment,
-  userId: string,
+  _userId: string,
   oldStatus: string,
-  clientEmail?: string,
-  clientPhone?: string
-): Promise<{ email: boolean; whatsapp: boolean }> => {
-  if (shipment.companyId) {
-    return sendClientStatusUpdateNotification(shipment, oldStatus);
-  }
-
-  const results = { email: false, whatsapp: false };
-  const preferences = await getUserNotificationPreferences(userId);
-
-  if (!preferences.statusUpdates) return results;
-
-  if (preferences.email && clientEmail) {
-    results.email = await sendStatusUpdateEmail(
-      shipment,
-      clientEmail,
-      oldStatus
-    );
-  }
-
-  if (preferences.whatsapp || TEST_WHATSAPP_PHONE) {
-    const whatsappNumber =
-      clientPhone ||
-      (await getUserWhatsAppNumber(userId)) ||
-      TEST_WHATSAPP_PHONE;
-
-    if (whatsappNumber) {
-      const message = await renderWhatsAppTemplate(
-        "status_update_whatsapp",
-        shipment,
-        { oldStatus }
-      );
-      results.whatsapp = await sendWhatsAppMessage({
-        to: formatPhoneNumber(whatsappNumber),
-        message,
-      });
-    }
-  }
-
-  return results;
+  _clientEmail?: string,
+  _clientPhone?: string
+): Promise<{ email: boolean; push: boolean }> => {
+  return sendClientStatusUpdateNotification(shipment, oldStatus);
 };

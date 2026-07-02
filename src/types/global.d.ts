@@ -24,9 +24,13 @@ declare module '@/context/auth-context' {
         isOperator: () => boolean;
         isStaff: () => boolean;
         isCompanyUser: () => boolean;
-        canAccessAdminFeatures: () => boolean;
-        canManageShipments: () => boolean;
-        loading: boolean;
+  canAccessAdminFeatures: () => boolean;
+  canManageShipments: () => boolean;
+  canCreateShipment: () => boolean;
+  canImportShipments: () => boolean;
+  canSyncExcel: () => boolean;
+  canDeleteAllShipments: () => boolean;
+  loading: boolean;
         refreshUserData: () => Promise<void>;
     }
 

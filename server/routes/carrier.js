@@ -46,7 +46,7 @@ async function applyCarrierUpdate(db, shipmentId, shipmentData, user) {
 
   const updatedShipment = { id: shipmentId, ...shipmentData, ...updates };
 
-  let notifications = { email: false, whatsapp: false };
+  let notifications = { email: false, push: false };
   try {
     notifications = await sendClientStatusUpdateNotification(
       updatedShipment,
