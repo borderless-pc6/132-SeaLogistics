@@ -38,7 +38,7 @@
   display: inline-flex;
   align-items: center;
   gap: 8px;
-  background: var(--primary-color, #789170);
+  background: var(--primary-color, #16786a);
   color: white;
   border: none;
   padding: 10px 18px;

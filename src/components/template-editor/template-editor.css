@@ -21,9 +21,9 @@
 }
 
 .template-tab.active {
-  background: var(--primary-color, #789170);
+  background: var(--primary-color, #16786a);
   color: white;
-  border-color: var(--primary-color, #789170);
+  border-color: var(--primary-color, #16786a);
 }
 
 .template-form {
@@ -84,7 +84,7 @@
 }
 
 .template-save-btn {
-  background: var(--primary-color, #789170);
+  background: var(--primary-color, #16786a);
   color: white;
   border: none;
   padding: 10px 20px;

@@ -173,12 +173,20 @@ export const ShipmentsProvider: React.FC<ShipmentsProviderProps> = ({
 
       const isAdmin_ = isAdmin();
       const isOperator_ = currentUser.role === UserRole.OPERATOR;
+      const isCompanyUser_ = currentUser.role === UserRole.COMPANY_USER;
 
-      if (!isAdmin_ && !isOperator_) {
+      if (!isAdmin_ && !isOperator_ && !isCompanyUser_) {
         throw new Error("Você não tem permissão para criar novos shipments");
       }
 
-      const companyIdToUse = shipmentData.companyId;
+      let companyIdToUse = shipmentData.companyId;
+
+      if (isCompanyUser_) {
+        if (!currentUser.companyId) {
+          throw new Error("Sua conta não está vinculada a uma empresa");
+        }
+        companyIdToUse = currentUser.companyId;
+      }
 
       const shipmentWithCompany: Record<string, unknown> = {
         ...shipmentData,
@@ -334,8 +342,11 @@ export const ShipmentsProvider: React.FC<ShipmentsProviderProps> = ({
   };
 
   const canCreateShipment = (): boolean => {
+    if (!currentUser) return false;
     return (
-      isAdmin() || currentUser?.role === UserRole.OPERATOR
+      isAdmin() ||
+      currentUser.role === UserRole.OPERATOR ||
+      currentUser.role === UserRole.COMPANY_USER
     );
   };
 

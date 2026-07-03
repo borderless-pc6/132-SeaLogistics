@@ -234,7 +234,7 @@ export const AdminDashboard = () => {
                   padding: "12px 20px",
                   background: isExporting 
                     ? "linear-gradient(135deg, #95a5a6 0%, #7f8c8d 100%)"
-                    : "linear-gradient(135deg, #789170 0%, #5a7a5a 100%)",
+                    : "linear-gradient(135deg, #16786a 0%, #24d4a0 100%)",
                   color: "white",
                   border: "none",
                   borderRadius: "8px",

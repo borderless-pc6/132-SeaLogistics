@@ -49,7 +49,7 @@ export async function loginWithApi(
   const response = await fetch(`${API_URL}/api/auth/login`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ email, password }),
+    body: JSON.stringify({ email: email.trim().toLowerCase(), password }),
   });
 
   const data = (await response.json()) as LoginResponse;
@@ -118,4 +118,28 @@ export async function apiFetch(
   }
 
   return fetch(`${API_URL}${path}`, { ...options, headers });
+}
+
+export async function provisionFirebaseUser(data: {
+  uid: string;
+  email: string;
+  password: string;
+  displayName: string;
+}): Promise<void> {
+  const response = await fetch(`${API_URL}/api/auth/provision-user`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({
+      uid: data.uid,
+      email: data.email.trim().toLowerCase(),
+      password: data.password,
+      displayName: data.displayName,
+    }),
+  });
+
+  const result = (await response.json()) as { success?: boolean; error?: string };
+
+  if (!response.ok) {
+    throw new Error(result.error || "Erro ao provisionar usuário Firebase");
+  }
 }

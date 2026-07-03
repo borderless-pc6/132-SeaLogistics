@@ -10,7 +10,7 @@ import { useAuth } from "../../context/auth-context";
 import { LanguageProvider, useLanguage } from "../../context/language-context";
 import { useToast } from "../../context/toast-context";
 import { db } from "../../lib/firebaseConfig";
-import { registerFcmToken, unregisterFcmToken, verifyPushConnection } from "../../services/pushNotificationService";
+import { registerFcmToken, unregisterFcmToken } from "../../services/pushNotificationService";
 import type { UserSettings } from "../../types/user";
 import "./Settings.css";
 
@@ -67,11 +67,9 @@ const SettingsContent = () => {
 
   const [isLoading, setIsLoading] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
-  const [pushBackendReady, setPushBackendReady] = useState<boolean | null>(null);
 
   useEffect(() => {
     loadUserSettings();
-    verifyPushConnection().then(setPushBackendReady).catch(() => setPushBackendReady(false));
   }, []);
 
   const loadUserSettings = async () => {
@@ -355,20 +353,6 @@ const SettingsContent = () => {
                   <Bell size={20} />
                   <h2>{translations.notifications}</h2>
                 </div>
-
-                {pushBackendReady !== null && (
-                  <p
-                    style={{
-                      fontSize: "0.9rem",
-                      color: pushBackendReady ? "#27ae60" : "#e67e22",
-                      marginBottom: "1rem",
-                    }}
-                  >
-                    {pushBackendReady
-                      ? "Servidor de push configurado."
-                      : "Servidor de push não detectado — notificações no navegador podem não funcionar até configurar FIREBASE_SERVICE_ACCOUNT no backend."}
-                  </p>
-                )}
 
                 <div className="notification-settings">
                   <div className="notification-item">

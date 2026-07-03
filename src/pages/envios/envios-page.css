@@ -7,8 +7,8 @@
 
 .envios-content {
   flex: 1;
-  margin-left: var(--page-content-offset);
-  padding: var(--space-lg);
+  margin-left: 0;
+  padding: calc(var(--app-header-height, 64px) + var(--space-lg)) var(--space-lg) var(--space-lg);
   overflow-y: auto;
   transition: margin-left var(--transition-base);
   box-sizing: border-box;
@@ -52,7 +52,7 @@
   display: inline-flex;
   align-items: center;
   gap: 6px;
-  border: 1px solid rgba(61, 186, 140, 0.2);
+  border: 1px solid rgba(36, 212, 160, 0.3);
 }
 
 .filter-tag::before {

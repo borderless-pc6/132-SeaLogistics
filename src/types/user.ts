@@ -40,6 +40,9 @@ export interface User {
   companyId?: string; // Para usuários de empresa
   companyName?: string; // Cache do nome da empresa
   phone?: string;
+  position?: string;
+  /** Funcionário criado pela empresa deve trocar a senha no primeiro acesso */
+  mustChangePassword?: boolean;
   /** Tokens FCM para push notifications no navegador */
   fcmTokens?: string[];
   isActive: boolean;

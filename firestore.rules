@@ -27,6 +27,16 @@ service cloud.firestore {
     function isStaff() {
       return isAdmin() || isOperator();
     }
+
+    function isCompanyUser() {
+      return isAuthenticated() &&
+        exists(/databases/$(database)/documents/users/$(request.auth.uid)) &&
+        get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'company_user';
+    }
+
+    function getUserCompanyId() {
+      return get(/databases/$(database)/documents/users/$(request.auth.uid)).data.companyId;
+    }
     
     // Função para verificar se o usuário é da mesma empresa
     function isSameCompany(companyId) {
@@ -65,8 +75,10 @@ service cloud.firestore {
       allow read, update: if isAuthenticated() && 
                            isSameCompany(resource.data.companyId);
       
-      // Staff pode criar novos shipments
-      allow create: if isStaff();
+      // Staff ou empresa pode criar envios (empresa só na própria companyId)
+      allow create: if isStaff() ||
+        (isCompanyUser() &&
+         request.resource.data.companyId == getUserCompanyId());
     }
     
     // Regras para histórico de status dos embarques

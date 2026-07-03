@@ -193,7 +193,7 @@ export const exportDashboardToPDF = async (options: PDFExportOptions) => {
       body: statsData,
       theme: "striped",
       headStyles: {
-        fillColor: [120, 145, 112], // #789170
+        fillColor: [22, 120, 106], // #16786a
         textColor: 255,
         fontStyle: "bold",
         fontSize: 10,

@@ -86,7 +86,7 @@
 /* Loading spinner */
 .spinner {
   border: 3px solid #f3f3f3;
-  border-top: 3px solid #789170;
+  border-top: 3px solid var(--accent-color);
   border-radius: 50%;
   width: 24px;
   height: 24px;

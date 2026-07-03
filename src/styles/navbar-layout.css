@@ -1,38 +1,10 @@
-/* Offsets do conteúdo principal conforme largura da navbar */
 :root {
-  --page-content-offset: 292px; /* 16px + 260px + 16px */
-}
-
-:root[data-navbar-collapsed="true"] {
-  --page-content-offset: 108px; /* 16px + 76px + 16px */
-}
-
-@media (max-width: 1024px) {
-  :root {
-    --page-content-offset: 268px; /* 12px + 240px + 16px */
-  }
-
-  :root[data-navbar-collapsed="true"] {
-    --page-content-offset: 100px; /* 12px + 72px + 16px */
-  }
+  --app-header-height: 64px;
+  --page-content-offset: 0;
 }
 
 @media (max-width: 768px) {
   :root {
-    --page-content-offset: 244px; /* 8px + 220px + 16px */
-  }
-
-  :root[data-navbar-collapsed="true"] {
-    --page-content-offset: 88px; /* 8px + 64px + 16px */
-  }
-}
-
-@media (max-width: 480px) {
-  :root {
-    --page-content-offset: 224px; /* 8px + 200px + 16px */
-  }
-
-  :root[data-navbar-collapsed="true"] {
-    --page-content-offset: 84px; /* 8px + 60px + 16px */
+    --app-header-height: 56px;
   }
 }

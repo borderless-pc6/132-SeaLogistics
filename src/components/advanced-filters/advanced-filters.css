@@ -23,14 +23,14 @@
 }
 
 .filters-toggle-btn:hover {
-  border-color: var(--primary-color, #315851);
+  border-color: var(--primary-color, #16786a);
   background: #f8f9fa;
 }
 
 .filters-toggle-btn.active {
-  background: var(--primary-color, #315851);
+  background: var(--primary-color, #16786a);
   color: white;
-  border-color: var(--primary-color, #315851);
+  border-color: var(--primary-color, #16786a);
 }
 
 .active-filters-badge {
@@ -137,7 +137,7 @@
 .filter-group select:focus,
 .filter-group input:focus {
   outline: none;
-  border-color: var(--primary-color, #315851);
+  border-color: var(--primary-color, #16786a);
   box-shadow: 0 0 0 3px rgba(49, 88, 81, 0.1);
 }
 
@@ -157,7 +157,7 @@
 }
 
 .filters-results strong {
-  color: var(--primary-color, #315851);
+  color: var(--primary-color, #16786a);
 }
 
 /* Ações dos filtros */

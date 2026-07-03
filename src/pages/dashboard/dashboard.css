@@ -7,10 +7,12 @@
 
 .dashboard-content {
   flex: 1;
-  margin-left: var(--page-content-offset);
-  padding: var(--space-lg);
+  margin-left: 0;
+  max-width: 1400px;
+  width: 100%;
+  margin-inline: auto;
+  padding: calc(var(--app-header-height, 64px) + var(--space-lg)) var(--space-lg) var(--space-lg);
   overflow-y: auto;
-  transition: margin-left var(--transition-base);
   box-sizing: border-box;
   min-height: 100vh;
   position: relative;
@@ -41,20 +43,20 @@
   align-items: center;
   gap: 8px;
   padding: 12px 20px;
-  background: linear-gradient(135deg, #789170 0%, #5a7a5a 100%);
+  background: linear-gradient(135deg, var(--primary-color) 0%, var(--primary-light) 100%);
   color: white;
   border: none;
   border-radius: 8px;
   cursor: pointer;
   font-size: 14px;
   font-weight: 500;
-  box-shadow: 0 4px 12px rgba(120, 145, 112, 0.3);
+  box-shadow: 0 4px 12px rgba(22, 120, 106, 0.35);
   transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
 }
 
 .export-pdf-button:hover {
   transform: translateY(-2px);
-  box-shadow: 0 6px 16px rgba(120, 145, 112, 0.4);
+  box-shadow: 0 6px 16px rgba(36, 212, 160, 0.45);
 }
 
 .export-pdf-button:active {
@@ -101,7 +103,7 @@
   left: 0;
   right: 0;
   height: 3px;
-  background: linear-gradient(90deg, var(--primary-color, #789170) 0%, transparent 100%);
+  background: linear-gradient(90deg, var(--primary-color) 0%, var(--accent-color) 60%, transparent 100%);
   opacity: 0;
   transition: opacity 0.3s ease;
 }
@@ -118,7 +120,7 @@
 .stat-card.clickable:hover {
   transform: translateY(-6px) scale(1.02);
   box-shadow: 0 12px 24px rgba(0, 0, 0, 0.12), 0 4px 8px rgba(0, 0, 0, 0.08);
-  border-color: rgba(120, 145, 112, 0.2);
+  border-color: rgba(36, 212, 160, 0.35);
 }
 
 .stat-card.clickable:active {
@@ -127,7 +129,7 @@
 }
 
 .stat-icon {
-  background: linear-gradient(135deg, var(--primary-color, #789170) 0%, rgba(120, 145, 112, 0.85) 100%);
+  background: linear-gradient(135deg, var(--primary-color) 0%, var(--accent-color) 100%);
   color: white;
   border-radius: 14px;
   padding: 14px;
@@ -135,13 +137,13 @@
   align-items: center;
   justify-content: center;
   flex-shrink: 0;
-  box-shadow: 0 4px 12px rgba(120, 145, 112, 0.3);
+  box-shadow: 0 4px 12px rgba(22, 120, 106, 0.35);
   transition: all 0.3s ease;
 }
 
 .stat-card.clickable:hover .stat-icon {
   transform: rotate(-5deg) scale(1.1);
-  box-shadow: 0 6px 16px rgba(120, 145, 112, 0.4);
+  box-shadow: 0 6px 16px rgba(36, 212, 160, 0.45);
 }
 
 .stat-icon.in-transit {
@@ -215,7 +217,7 @@
 
 .stat-info h3 {
   font-size: 12px;
-  color: #6c757d;
+  color: var(--text-muted);
   margin: 0 0 8px 0;
   font-weight: 600;
   white-space: nowrap;
@@ -228,7 +230,7 @@
 .stat-number {
   font-size: 28px;
   font-weight: 800;
-  color: #2c3e50;
+  color: var(--text-primary);
   margin: 0;
   white-space: nowrap;
   line-height: 1;
@@ -273,7 +275,7 @@
 }
 
 .action-icon {
-  background: var(--primary-color, #789170);
+  background: var(--primary-color, #16786a);
   color: white;
   border-radius: 10px;
   padding: 12px;

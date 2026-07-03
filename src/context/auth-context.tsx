@@ -5,12 +5,15 @@ import {
   getDocs,
   query,
   setDoc,
+  updateDoc,
   where,
 } from "firebase/firestore";
 import {
   onAuthStateChanged,
   signInWithCustomToken,
+  signInWithEmailAndPassword,
   signOut,
+  updatePassword,
 } from "firebase/auth";
 import React, {
   createContext,
@@ -22,20 +25,22 @@ import React, {
 } from "react";
 import { auth, db } from "../lib/firebaseConfig";
 import { clearAuthToken, getAuthToken, loginWithApi, refreshFirebaseSession, storeAuthToken } from "../services/authApi";
+import { ensureFirebaseSignIn } from "../services/firebaseAuthClient";
 import { Company, User, UserRole } from "../types/user";
 import {
   isRetryableAuthError,
   logAuthError,
   mapAuthError,
 } from "../utils/authErrorHandler";
-import { verifyPassword } from "../utils/passwordUtils";
+import { hashPassword, verifyPassword } from "../utils/passwordUtils";
+import { normalizeEmail } from "../utils/normalizeEmail";
 import { retryWithBackoff } from "../utils/retryWithBackoff";
 import { registerFcmToken, shouldRegisterPush, unregisterFcmToken } from "../services/pushNotificationService";
 
 interface AuthContextType {
   currentUser: User | null;
   currentCompany: Company | null;
-  login: (email: string, password: string) => Promise<void>;
+  login: (email: string, password: string) => Promise<User>;
   logout: () => void;
   isAdmin: () => boolean;
   isOperator: () => boolean;
@@ -47,6 +52,9 @@ interface AuthContextType {
   canImportShipments: () => boolean;
   canSyncExcel: () => boolean;
   canDeleteAllShipments: () => boolean;
+  canManageEmployees: () => boolean;
+  mustChangePassword: () => boolean;
+  completePasswordChange: (newPassword: string) => Promise<{ firebaseSessionReady: boolean }>;
   loading: boolean;
   refreshUserData: () => Promise<void>;
 }
@@ -74,6 +82,16 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
 
   const establishFirebaseSession = async (firebaseCustomToken: string) => {
     await signInWithCustomToken(auth, firebaseCustomToken);
+  };
+
+  const tryFirebaseEmailSignIn = async (email: string, password: string) => {
+    try {
+      await signInWithEmailAndPassword(auth, email, password);
+      return true;
+    } catch (error) {
+      console.warn("[Auth] Firebase email/senha indisponível:", error);
+      return false;
+    }
   };
 
   const tryRestoreFirebaseSession = async (): Promise<boolean> => {
@@ -382,12 +400,17 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
     };
   }, [currentUser]);
 
-  const loginViaFirestore = async (email: string, password: string) => {
+  const loginViaFirestore = async (
+    email: string,
+    password: string
+  ): Promise<User> => {
+    const normalizedEmail = normalizeEmail(email);
+
     const querySnapshot = await retryWithBackoff(
       async () => {
         const usersQuery = query(
           collection(db, "users"),
-          where("email", "==", email)
+          where("email", "==", normalizedEmail)
         );
         return await getDocs(usersQuery);
       },
@@ -459,6 +482,13 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
 
     setCurrentUser(finalUserData);
 
+    await ensureFirebaseSignIn({
+      uid: userDoc.id,
+      email: normalizedEmail,
+      password,
+      displayName: userData.displayName || userData.email,
+    });
+
     if (userData.role === UserRole.COMPANY_USER && userData.companyId) {
       try {
         const companyDoc = await retryWithBackoff(
@@ -491,14 +521,19 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
         name: userData.displayName,
         id: userDoc.id,
         role: userData.role,
+        mustChangePassword: userData.mustChangePassword ?? false,
       })
     );
+
+    return finalUserData;
   };
 
-  const login = async (email: string, password: string) => {
+  const login = async (email: string, password: string): Promise<User> => {
+    const normalizedEmail = normalizeEmail(email);
+
     try {
       try {
-        const apiResponse = await loginWithApi(email, password);
+        const apiResponse = await loginWithApi(normalizedEmail, password);
 
         if (!apiResponse.user?.uid) {
           throw new Error(apiResponse.error || "Erro ao autenticar");
@@ -511,13 +546,15 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
         if (apiResponse.firebaseCustomToken) {
           await establishFirebaseSession(apiResponse.firebaseCustomToken);
         } else {
-          console.warn(
-            "Firebase custom token indisponível. Configure FIREBASE_SERVICE_ACCOUNT no backend para acessar envios."
-          );
+          await tryFirebaseEmailSignIn(normalizedEmail, password);
         }
 
         await loadUserData(apiResponse.user.uid);
-        return;
+        const userDoc = await getDoc(doc(db, "users", apiResponse.user.uid));
+        if (userDoc.exists()) {
+          return { ...userDoc.data(), uid: userDoc.id } as User;
+        }
+        return { ...apiResponse.user, uid: apiResponse.user.uid } as User;
       } catch (apiError) {
         const message =
           apiError instanceof Error ? apiError.message : String(apiError);
@@ -536,7 +573,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
           "API de login indisponível, usando autenticação direta no Firestore:",
           message
         );
-        await loginViaFirestore(email, password);
+        return await loginViaFirestore(normalizedEmail, password);
       }
     } catch (error) {
       logAuthError(error, "login");
@@ -599,7 +636,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
   };
 
   const canCreateShipment = () => {
-    return isStaff();
+    return isStaff() || isCompanyUser();
   };
 
   const canImportShipments = () => {
@@ -612,6 +649,61 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
 
   const canDeleteAllShipments = () => {
     return isAdmin();
+  };
+
+  const canManageEmployees = () => {
+    return isCompanyUser() && Boolean(currentUser?.companyId);
+  };
+
+  const mustChangePassword = () => {
+    return Boolean(currentUser?.mustChangePassword);
+  };
+
+  const completePasswordChange = async (
+    newPassword: string
+  ): Promise<{ firebaseSessionReady: boolean }> => {
+    if (!currentUser?.uid) {
+      throw new Error("Usuário não autenticado");
+    }
+
+    if (!currentUser.mustChangePassword) {
+      throw new Error("Troca de senha não é necessária neste momento");
+    }
+
+    const passwordHash = await hashPassword(newPassword);
+    const normalizedEmail = normalizeEmail(currentUser.email);
+
+    await updateDoc(doc(db, "users", currentUser.uid), {
+      passwordHash,
+      mustChangePassword: false,
+      updatedAt: new Date(),
+    });
+
+    let firebaseSessionReady = false;
+
+    if (
+      auth.currentUser &&
+      normalizeEmail(auth.currentUser.email || "") === normalizedEmail
+    ) {
+      try {
+        await updatePassword(auth.currentUser, newPassword);
+        firebaseSessionReady = true;
+      } catch (error) {
+        console.warn("[Auth] Falha ao atualizar senha no Firebase Auth:", error);
+      }
+    }
+
+    if (!firebaseSessionReady) {
+      firebaseSessionReady = await ensureFirebaseSignIn({
+        uid: currentUser.uid,
+        email: normalizedEmail,
+        password: newPassword,
+        displayName: currentUser.displayName || currentUser.email,
+      });
+    }
+
+    await refreshUserData();
+    return { firebaseSessionReady };
   };
 
   const value: AuthContextType = {
@@ -629,6 +721,9 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
     canImportShipments,
     canSyncExcel,
     canDeleteAllShipments,
+    canManageEmployees,
+    mustChangePassword,
+    completePasswordChange,
     loading,
     refreshUserData,
   };

@@ -1,63 +1,15 @@
-.novo-envio-main {
-  display: flex;
-  min-height: 100vh;
-  background: var(--bg-page);
-}
-
 .novo-envio-content {
-  flex: 1;
-  margin-left: var(--page-content-offset);
-  padding: var(--space-lg);
-  transition: margin-left var(--transition-base);
-  padding-bottom: 100px;
+  max-width: 900px;
 }
 
 .novo-envio-container {
-  max-width: 900px;
-  margin: 0 auto;
+  min-height: 100vh;
 }
 
 .novo-envio-form {
   display: flex;
   flex-direction: column;
   gap: var(--space-xl);
-}
-
-.novo-envio-header {
-  display: flex;
-  align-items: center;
-  gap: var(--space-md);
-  margin-bottom: var(--space-xl);
-  background: var(--bg-card);
-  padding: var(--space-lg);
-  border-radius: var(--radius-lg);
-  box-shadow: var(--shadow-sm);
-  border: 1px solid var(--border-color);
-}
-
-.header-icon {
-  background: linear-gradient(135deg, var(--primary-color), var(--accent-color));
-  padding: 14px;
-  border-radius: var(--radius-md);
-  color: white;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  flex-shrink: 0;
-}
-
-.header-content h1 {
-  color: var(--text-primary);
-  font-size: var(--text-2xl);
-  margin: 0 0 4px 0;
-  font-weight: 700;
-  letter-spacing: -0.02em;
-}
-
-.header-content p {
-  color: var(--text-secondary);
-  margin: 0;
-  font-size: var(--text-sm);
 }
 
 .form-section {
@@ -82,269 +34,130 @@
 }
 
 .section-header h2 {
+  font-size: var(--text-lg);
+  font-weight: 700;
   color: var(--text-primary);
   margin: 0;
-  font-size: var(--text-lg);
-  font-weight: 600;
 }
 
 .form-row {
   display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: 1.5rem;
-  margin-bottom: 1.5rem;
+  grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+  gap: var(--space-md);
+  margin-bottom: var(--space-md);
 }
 
-/* Estilos específicos para o formulário de novo envio */
-.novo-envio-form .form-group {
-  /* Estilos específicos adicionais se necessário */
+.form-row:last-child {
+  margin-bottom: 0;
 }
 
-/* Estilos específicos para campos de aeroporto no formulário de novo envio */
-.novo-envio-form .form-group select[name="pol"],
-.novo-envio-form .form-group select[name="pod"] {
-  /* Estilos específicos adicionais se necessário */
+.form-group {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
 }
 
-/* Estilos específicos para validação no formulário de novo envio */
-.novo-envio-form .form-group input:focus,
-.novo-envio-form .form-group select:focus {
-  /* Estilos específicos adicionais se necessário */
-}
-
-.cliente-info {
-  margin-top: 1rem;
-}
-
-.cliente-card {
-  background: #f8f9fa;
-  padding: 1.5rem;
-  border-radius: 12px;
-  border-left: 4px solid #118ab2;
-}
-
-.cliente-card h3 {
-  color: #2c3e50;
-  margin: 0 0 0.5rem 0;
-  font-size: 1.1rem;
+.form-group label {
+  font-size: var(--text-sm);
   font-weight: 600;
+  color: var(--text-primary);
 }
 
-.cliente-card p {
-  color: #5a6c7d;
-  margin: 0.25rem 0;
-  font-size: 0.9rem;
+.form-group input,
+.form-group select,
+.form-group textarea {
+  padding: 0.75rem 1rem;
+  border: 1.5px solid var(--gray-200);
+  border-radius: var(--radius-sm);
+  font-size: var(--text-base);
+  background: var(--white);
+  color: var(--text-primary);
+  transition: border-color var(--transition-fast), box-shadow var(--transition-fast);
+}
+
+.form-group input:focus,
+.form-group select:focus,
+.form-group textarea:focus {
+  outline: none;
+  border-color: var(--accent-color);
+  box-shadow: var(--shadow-focus);
+}
+
+.input-readonly {
+  background: var(--gray-100) !important;
+  color: var(--text-secondary) !important;
+  cursor: not-allowed;
+}
+
+.input-error {
+  border-color: var(--error) !important;
+}
+
+.error-text {
+  font-size: var(--text-xs);
+  color: var(--error);
 }
 
 .form-actions {
   display: flex;
   justify-content: flex-end;
-  gap: 1rem;
-  margin-top: 2rem;
-  padding: 2rem;
-  background: white;
-  border-radius: 16px;
-  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.08);
-}
-
-.btn-cancel,
-.btn-submit {
-  padding: 0.75rem 2rem;
-  border: none;
-  border-radius: 8px;
-  font-size: 1rem;
-  font-weight: 500;
-  cursor: pointer;
-  transition: all 0.2s ease;
-  min-width: 120px;
+  gap: var(--space-md);
+  padding-top: var(--space-md);
 }
 
 .btn-cancel {
-  background: #6c757d;
-  color: white;
+  padding: 0.75rem 1.5rem;
+  border-radius: var(--radius-sm);
+  border: 1.5px solid var(--border-color-strong);
+  background: var(--white);
+  color: var(--text-secondary);
+  font-weight: 600;
+  font-family: inherit;
+  cursor: pointer;
+  transition: all var(--transition-fast);
 }
 
 .btn-cancel:hover {
-  background: #5a6268;
-  transform: translateY(-1px);
+  border-color: var(--accent-color);
+  color: var(--accent-color);
 }
 
 .btn-submit {
-  background: linear-gradient(135deg, #118ab2, #06d6a0);
+  padding: 0.75rem 1.75rem;
+  border-radius: var(--radius-sm);
+  border: none;
+  background: var(--accent-color);
   color: white;
-  box-shadow: 0 4px 12px rgba(17, 138, 178, 0.3);
+  font-weight: 700;
+  font-family: inherit;
+  cursor: pointer;
+  box-shadow: 0 4px 14px rgba(37, 99, 235, 0.35);
+  transition: all var(--transition-fast);
 }
 
 .btn-submit:hover:not(:disabled) {
-  transform: translateY(-2px);
-  box-shadow: 0 6px 20px rgba(17, 138, 178, 0.4);
+  background: var(--secondary-color);
+  transform: translateY(-1px);
 }
 
 .btn-submit:disabled {
   opacity: 0.6;
   cursor: not-allowed;
-  transform: none;
 }
 
-/* Responsividade */
-@media (max-width: 768px) {
-  .novo-envio-content {
-    padding: 1rem;
-  }
+.form-container {
+  animation: fadeIn 0.4s ease-out;
+  margin-top: var(--space-md);
+}
 
-  .novo-envio-header {
-    flex-direction: column;
-    text-align: center;
-    padding: 1.5rem;
-  }
-
-  .header-content h1 {
-    font-size: 1.5rem;
-  }
-
-  .form-section {
-    padding: 1.5rem;
-  }
-
-  .form-row {
-    grid-template-columns: 1fr;
-    gap: 1rem;
-  }
-
+@media (max-width: 640px) {
   .form-actions {
-    flex-direction: column;
-    padding: 1.5rem;
+    flex-direction: column-reverse;
   }
 
   .btn-cancel,
   .btn-submit {
     width: 100%;
+    text-align: center;
   }
-}
-
-@media (max-width: 480px) {
-  .novo-envio-container {
-    padding: 0.5rem;
-  }
-
-  .novo-envio-header {
-    padding: 1rem;
-  }
-
-  .form-section {
-    padding: 1rem;
-  }
-
-  .section-header {
-    flex-direction: column;
-    align-items: flex-start;
-    gap: 0.5rem;
-  }
-}
-
-/* Animações */
-.form-section {
-  animation: slideUp 0.3s ease-out;
-}
-
-@keyframes slideUp {
-  from {
-    opacity: 0;
-    transform: translateY(20px);
-  }
-  to {
-    opacity: 1;
-    transform: translateY(0);
-  }
-}
-
-.cliente-card {
-  animation: fadeIn 0.3s ease-out;
-}
-
-@keyframes fadeIn {
-  from {
-    opacity: 0;
-    transform: scale(0.95);
-  }
-  to {
-    opacity: 1;
-    transform: scale(1);
-  }
-}
-
-/* Mensagem de acesso negado */
-.access-denied {
-  background: white;
-  border-radius: 16px;
-  padding: 3rem 2rem;
-  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.1);
-  border: 1px solid rgba(0, 0, 0, 0.05);
-  text-align: center;
-  max-width: 500px;
-  margin: 2rem auto;
-}
-
-.access-denied h2 {
-  color: #e74c3c;
-  font-size: 1.5rem;
-  font-weight: 600;
-  margin: 0 0 1rem 0;
-}
-
-.access-denied p {
-  color: #5a6c7d;
-  font-size: 1rem;
-  margin: 0;
-  line-height: 1.5;
-}
-
-/* Estilos para botão de logout na navbar */
-.logout-item {
-  margin-top: auto;
-  border-top: 1px solid rgba(255, 255, 255, 0.1);
-  padding-top: 1rem !important;
-}
-
-.logout-item:hover {
-  background: rgba(231, 76, 60, 0.1) !important;
-  color: #e74c3c !important;
-}
-
-.logout-item .icon-container {
-  background: rgba(231, 76, 60, 0.1);
-}
-
-/* Responsividade */
-@media (max-width: 768px) {
-  .access-denied {
-    margin: 1rem;
-    padding: 2rem 1rem;
-  }
-
-  .access-denied h2 {
-    font-size: 1.3rem;
-  }
-
-  .access-denied p {
-    font-size: 0.9rem;
-  }
-}
-
-.page-header {
-  text-align: center;
-  margin-bottom: 3rem;
-}
-
-.page-header h1 {
-  color: var(--primary-color);
-  margin-bottom: 1rem;
-  font-size: 2.5rem;
-  font-weight: 700;
-}
-
-.page-header p {
-  color: #666;
-  font-size: 1.1rem;
-  margin: 0;
 }

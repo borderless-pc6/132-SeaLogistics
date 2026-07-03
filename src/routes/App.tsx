@@ -1,8 +1,7 @@
 import { Route, BrowserRouter as Router, Routes } from "react-router-dom";
 import ExcelSpecificTest from "../components/excel-specific-test/excel-specific-test";
-import { Footer } from "../components/footer/footer";
 import { NavbarProvider } from "../components/navbar/navbar-provider";
-import { AdminRoute, PrivateRoute, StaffRoute } from "../components/protected-route";
+import { AdminRoute, PrivateRoute } from "../components/protected-route";
 import { AuthProvider } from "../context/auth-context";
 import { LanguageProvider } from "../context/language-context";
 import { ShipmentsProvider } from "../context/shipments-context";
@@ -13,7 +12,9 @@ import { Dashboard } from "../pages/dashboard/dashboard";
 import { EnviosPage } from "../pages/envios/envios-page";
 import { ShipmentDetailPage } from "../pages/envios/shipment-detail-page";
 import ExcelIntegrationPage from "../pages/excel-integration/excel-integration-page";
-import { HomePage as Home } from "../pages/home/HomePage";
+import { ChangePasswordPage } from "../pages/change-password/change-password-page";
+import { EquipePage } from "../components/company-employees/company-employees";
+import { HomePage } from "../pages/home/HomePage";
 import { LoginPage as Login } from "../pages/login/login-page";
 import NovoEnvioPage from "../pages/novo-envio/novo-envio";
 import { RegisterPage as Register } from "../pages/register/register-page";
@@ -37,10 +38,26 @@ export const App = () => {
                   <Route path="/register" element={<Register />} />
 
                   <Route
+                    path="/change-password"
+                    element={
+                      <PrivateRoute>
+                        <ChangePasswordPage />
+                      </PrivateRoute>
+                    }
+                  />
+                  <Route
+                    path="/equipe"
+                    element={
+                      <PrivateRoute>
+                        <EquipePage />
+                      </PrivateRoute>
+                    }
+                  />
+                  <Route
                     path="/home"
                     element={
                       <PrivateRoute>
-                        <Home />
+                        <HomePage />
                       </PrivateRoute>
                     }
                   />
@@ -71,9 +88,9 @@ export const App = () => {
                   <Route
                     path="/novo-envio"
                     element={
-                      <StaffRoute>
+                      <PrivateRoute>
                         <NovoEnvioPage />
-                      </StaffRoute>
+                      </PrivateRoute>
                     }
                   />
                   <Route
@@ -126,8 +143,6 @@ export const App = () => {
                     }
                   />
                 </Routes>
-                {/* Footer aparece em todas as páginas autenticadas */}
-                <Footer theme="light" />
               </div>
             </Router>
             </NavbarProvider>

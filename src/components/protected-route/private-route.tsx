@@ -2,7 +2,7 @@
 
 import type React from "react";
 
-import { Navigate } from "react-router-dom";
+import { Navigate, useLocation } from "react-router-dom";
 import { useAuth } from "../../context/auth-context";
 
 interface PrivateRouteProps {
@@ -10,7 +10,8 @@ interface PrivateRouteProps {
 }
 
 export const PrivateRoute: React.FC<PrivateRouteProps> = ({ children }) => {
-  const { currentUser, loading } = useAuth();
+  const { currentUser, loading, mustChangePassword } = useAuth();
+  const location = useLocation();
 
   if (loading) {
     return (
@@ -47,6 +48,20 @@ export const PrivateRoute: React.FC<PrivateRouteProps> = ({ children }) => {
         <p>Sua conta está inativa. Entre em contato com o administrador.</p>
       </div>
     );
+  }
+
+  if (
+    mustChangePassword() &&
+    location.pathname !== "/change-password"
+  ) {
+    return <Navigate to="/change-password" replace />;
+  }
+
+  if (
+    !mustChangePassword() &&
+    location.pathname === "/change-password"
+  ) {
+    return <Navigate to="/home" replace />;
   }
 
   return <>{children}</>;

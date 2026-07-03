@@ -53,7 +53,7 @@
   width: 16px;
   height: 16px;
   border-radius: 50%;
-  background: var(--primary-color, #789170);
+  background: var(--primary-color, #16786a);
   border: 2px solid white;
   box-shadow: 0 0 0 2px #e9ecef;
 }

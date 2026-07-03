@@ -54,16 +54,15 @@ export default function LoginForm() {
 
     try {
       setLoginStep("Autenticando...");
-      await login(user.email, user.password);
+      const loggedInUser = await login(user.email, user.password);
       
       setLoginStep("Carregando dados do usuário...");
       
       showSuccess("Login realizado com sucesso!");
       console.log("Usuario logado com sucesso");
       
-      // Pequeno delay para mostrar mensagem de sucesso
       setTimeout(() => {
-        navigate("/home");
+        navigate(loggedInUser.mustChangePassword ? "/change-password" : "/home");
       }, 500);
     } catch (err: unknown) {
       console.error("Erro ao logar:", err);

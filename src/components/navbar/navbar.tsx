@@ -1,24 +1,22 @@
 "use client";
 
-import { ChevronLeft, ChevronRight, Home, LogOut, Plus, Settings, Ship } from "lucide-react";
-import { useContext, useState } from "react";
+import { Home, LogOut, Menu, Plus, Settings, Ship, Users, X } from "lucide-react";
+import { useState } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
 import logo2 from "../../assets/logo2.png";
 import { useAuth } from "../../context/auth-context";
 import { useLanguage } from "../../context/language-context";
-import { AdminPanel } from "../admin-panel/admin-panel";
-import { NavbarContext } from "./navbar-context";
 import "./navbar.css";
 
 const Navbar = () => {
-  const { isCollapsed, setIsCollapsed } = useContext(NavbarContext);
-  const [showAdminPanel, setShowAdminPanel] = useState(false);
+  const [mobileOpen, setMobileOpen] = useState(false);
   const navigate = useNavigate();
   const location = useLocation();
-  const { isAdmin, isStaff, logout } = useAuth();
+  const { isStaff, isAdmin, canCreateShipment, canManageEmployees, logout, currentUser } = useAuth();
   const { translations } = useLanguage();
 
   const getActiveItem = () => {
+    if (location.pathname.includes("equipe")) return "equipe";
     if (location.pathname.includes("settings")) return "settings";
     if (location.pathname.includes("novo-envio")) return "novo-envio";
     if (location.pathname.includes("envios")) return "envios";
@@ -27,119 +25,152 @@ const Navbar = () => {
 
   const activeItem = getActiveItem();
 
+  const handleNavigate = (path: string) => {
+    navigate(path);
+    setMobileOpen(false);
+  };
+
   const handleLogout = () => {
     logout();
     navigate("/");
+    setMobileOpen(false);
   };
+
+  const navItems = [
+    {
+      id: "home",
+      path: "/home",
+      icon: Home,
+      label: isStaff() ? translations.dashboard : translations.inicio,
+    },
+    {
+      id: "envios",
+      path: "/envios",
+      icon: Ship,
+      label: translations.envios,
+    },
+    ...(canManageEmployees()
+      ? [
+          {
+            id: "equipe",
+            path: "/equipe",
+            icon: Users,
+            label: "Equipe",
+          },
+        ]
+      : []),
+    ...(canCreateShipment()
+      ? [
+          {
+            id: "novo-envio",
+            path: "/novo-envio",
+            icon: Plus,
+            label: translations.novoEnvio,
+          },
+        ]
+      : []),
+    {
+      id: "settings",
+      path: "/settings",
+      icon: Settings,
+      label: translations.configuracoes,
+    },
+  ];
 
   return (
     <>
-      <div className={`navbar ${!isCollapsed ? "expanded" : "collapsed"}`}>
-        <div className="navbar-header">
-          <button
-            className="toggle-btn"
-            onClick={() => setIsCollapsed(!isCollapsed)}
-            aria-label={!isCollapsed ? translations.collapseMenu : translations.expandMenu}
-          >
-            {isCollapsed ? <ChevronRight size={24} /> : <ChevronLeft size={24} />}
-          </button>
-
-          <div className="company-logo">
-            <img
-              src={logo2 || "/placeholder.svg"}
-              alt="SeaLogistics Logo"
-              className={`company-logo-img ${!isCollapsed ? "visible" : "hidden"
-                }`}
-            />
-          </div>
-        </div>
-
-        <nav className="nav-items">
-          <div
-            className={`nav-item ${activeItem === "home" ? "active" : ""}`}
-            onClick={() => navigate("/home")}
-            role="button"
-            tabIndex={0}
-            onKeyDown={(e) => e.key === "Enter" && navigate("/home")}
-          >
-            <div className="icon-container">
-              <Home size={20} />
-            </div>
-            <span className={`nav-text ${!isCollapsed ? "visible" : "hidden"}`}>
-              {isStaff() ? translations.dashboard : translations.inicio}
-            </span>
-          </div>
-
-          <div
-            className={`nav-item ${activeItem === "envios" ? "active" : ""}`}
-            onClick={() => navigate("/envios")}
-            role="button"
-            tabIndex={0}
-            onKeyDown={(e) => e.key === "Enter" && navigate("/envios")}
-          >
-            <div className="icon-container">
-              <Ship size={20} />
-            </div>
-            <span className={`nav-text ${!isCollapsed ? "visible" : "hidden"}`}>
-              {translations.envios}
-            </span>
-          </div>
-
-          {/* Novo Envio — equipe operacional (admin/operador) */}
-          {isStaff() && (
-            <div
-              className={`nav-item ${activeItem === "novo-envio" ? "active" : ""
-                }`}
-              onClick={() => navigate("/novo-envio")}
-              role="button"
-              tabIndex={0}
-              onKeyDown={(e) => e.key === "Enter" && navigate("/novo-envio")}
-            >
-              <div className="icon-container">
-                <Plus size={20} />
-              </div>
-              <span
-                className={`nav-text ${!isCollapsed ? "visible" : "hidden"}`}
-              >
-                {translations.novoEnvio}
-              </span>
-            </div>
-          )}
-
-          <div
-            className={`nav-item ${activeItem === "settings" ? "active" : ""}`}
-            onClick={() => navigate("/settings")}
-            role="button"
-            tabIndex={0}
-            onKeyDown={(e) => e.key === "Enter" && navigate("/settings")}
-          >
-            <div className="icon-container">
-              <Settings size={20} />
-            </div>
-            <span className={`nav-text ${!isCollapsed ? "visible" : "hidden"}`}>
-              {translations.configuracoes}
-            </span>
-          </div>
-        </nav>
-
-        <div className="navbar-logout">
+      <header className="app-header">
+        <div className="app-header__inner">
           <button
             type="button"
-            className="logout-btn"
-            onClick={handleLogout}
-            aria-label={translations.sair}
+            className="app-header__menu-btn"
+            onClick={() => setMobileOpen(!mobileOpen)}
+            aria-label={mobileOpen ? "Fechar menu" : "Abrir menu"}
           >
-            <LogOut size={20} />
-            <span className={`nav-text ${!isCollapsed ? "visible" : "hidden"}`}>
-              {translations.sair}
-            </span>
+            {mobileOpen ? <X size={22} /> : <Menu size={22} />}
           </button>
-        </div>
-      </div>
 
-      {/* Painel Administrativo Modal */}
-      {showAdminPanel && (
-        <AdminPanel onClose={() => setShowAdminPanel(false)} />
+          <button
+            type="button"
+            className="app-header__brand"
+            onClick={() => handleNavigate("/home")}
+          >
+            <img src={logo2 || "/placeholder.svg"} alt="SeaLogistics" className="app-header__logo" />
+            <span className="app-header__title">Sea Logistics</span>
+          </button>
+
+          <nav className="app-header__nav" aria-label="Navegação principal">
+            {navItems.map((item) => {
+              const Icon = item.icon;
+              return (
+                <button
+                  key={item.id}
+                  type="button"
+                  className={`app-header__link ${activeItem === item.id ? "active" : ""}`}
+                  onClick={() => handleNavigate(item.path)}
+                >
+                  <Icon size={18} />
+                  <span>{item.label}</span>
+                </button>
+              );
+            })}
+          </nav>
+
+          <div className="app-header__actions">
+            {canCreateShipment() && activeItem !== "novo-envio" && (
+              <button
+                type="button"
+                className="app-header__cta"
+                onClick={() => handleNavigate("/novo-envio")}
+              >
+                <Plus size={18} />
+                <span className="app-header__cta-text">{translations.novoEnvio}</span>
+              </button>
+            )}
+            {isAdmin() && (
+              <span className="app-header__role-badge">Admin</span>
+            )}
+            <div className="app-header__user" title={currentUser?.email || ""}>
+              <span className="app-header__user-name">
+                {currentUser?.displayName?.split(" ")[0] || "Usuário"}
+              </span>
+            </div>
+            <button
+              type="button"
+              className="app-header__logout"
+              onClick={handleLogout}
+              aria-label={translations.sair}
+            >
+              <LogOut size={18} />
+            </button>
+          </div>
+        </div>
+      </header>
+
+      {mobileOpen && (
+        <>
+          <div className="app-header__backdrop" onClick={() => setMobileOpen(false)} />
+          <nav className="app-header__mobile" aria-label="Menu mobile">
+            {navItems.map((item) => {
+              const Icon = item.icon;
+              return (
+                <button
+                  key={item.id}
+                  type="button"
+                  className={`app-header__mobile-link ${activeItem === item.id ? "active" : ""}`}
+                  onClick={() => handleNavigate(item.path)}
+                >
+                  <Icon size={20} />
+                  <span>{item.label}</span>
+                </button>
+              );
+            })}
+            <button type="button" className="app-header__mobile-logout" onClick={handleLogout}>
+              <LogOut size={20} />
+              <span>{translations.sair}</span>
+            </button>
+          </nav>
+        </>
       )}
     </>
   );

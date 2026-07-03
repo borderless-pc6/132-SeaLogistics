@@ -7,11 +7,17 @@
   
   .dashboard-content {
     flex: 1;
-    margin-left: var(--page-content-offset);
-    padding: var(--space-lg);
+    margin-left: 0;
+    max-width: 1400px;
+    width: 100%;
+    margin-inline: auto;
+    padding: calc(var(--app-header-height, 64px) + var(--space-lg)) var(--space-lg) var(--space-lg);
     overflow-y: auto;
-    transition: margin-left var(--transition-base);
     box-sizing: border-box;
+    min-height: 100vh;
+    position: relative;
+    z-index: 1;
+    padding-bottom: 100px;
   }
   
   .dashboard-header {
@@ -105,7 +111,7 @@
   }
   
   .stat-icon {
-    background: linear-gradient(135deg, var(--primary-color, #789170) 0%, rgba(120, 145, 112, 0.85) 100%) !important;
+    background: linear-gradient(135deg, var(--primary-color) 0%, var(--accent-color) 100%) !important;
     color: white !important;
     border-radius: 14px !important;
     padding: 16px !important;
@@ -113,13 +119,13 @@
     align-items: center !important;
     justify-content: center !important;
     flex-shrink: 0 !important;
-    box-shadow: 0 4px 12px rgba(120, 145, 112, 0.3) !important;
+    box-shadow: 0 4px 12px rgba(22, 120, 106, 0.3) !important;
     transition: all 0.3s ease !important;
   }
   
   .stat-card:hover .stat-icon {
     transform: rotate(-5deg) scale(1.1);
-    box-shadow: 0 6px 16px rgba(120, 145, 112, 0.4);
+    box-shadow: 0 6px 16px rgba(22, 120, 106, 0.4);
   }
   
   .stat-icon.in-transit {
@@ -353,13 +359,13 @@
   
   .filter-card:hover {
     background: #e9ecef;
-    border-color: var(--primary-color, #789170);
+    border-color: var(--primary-color, #16786a);
     transform: translateY(-2px);
     box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
   }
   
   .filter-icon {
-    background: var(--primary-color, #789170);
+    background: var(--primary-color, #16786a);
     color: white;
     border-radius: 8px;
     padding: 12px;
@@ -409,6 +415,7 @@
     height: 280px;
     display: flex;
     flex-direction: column;
+    overflow: hidden;
   }
   
   .quick-actions-section h2 {
@@ -421,48 +428,61 @@
     flex-direction: column;
     gap: 16px;
     flex: 1;
+    min-height: 0;
+    overflow-y: auto;
+    overflow-x: hidden;
+    padding-right: 4px;
+    scrollbar-width: thin;
+    scrollbar-color: var(--gray-300) transparent;
+  }
+
+  .quick-actions-grid::-webkit-scrollbar {
+    width: 6px;
+  }
+
+  .quick-actions-grid::-webkit-scrollbar-thumb {
+    background: var(--gray-300);
+    border-radius: var(--radius-full);
+  }
+
+  .quick-actions-grid::-webkit-scrollbar-thumb:hover {
+    background: var(--gray-400);
   }
   
   .quick-action-card {
     display: flex;
     align-items: center;
     gap: 16px;
-    background: #f8f9fa;
-    border: 2px solid #e1e5e9;
-    border-radius: 8px;
+    background: var(--bg-card);
+    border: 1px solid var(--border-color);
+    border-radius: var(--radius-md);
     padding: 20px;
-    color: #333;
+    color: var(--text-primary);
     text-decoration: none;
-    transition: all 0.2s ease;
+    transition: all var(--transition-fast);
     cursor: pointer;
-    position: relative;
-    overflow: hidden;
+    box-shadow: var(--shadow-xs);
+    flex-shrink: 0;
   }
-  
-  .quick-action-card::before {
-    content: '';
-    position: absolute;
-    top: 0;
-    left: -100%;
-    width: 100%;
-    height: 100%;
-    background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.2), transparent);
-    transition: left 0.5s;
+
+  .quick-action-card--primary {
+    border-color: rgba(37, 99, 235, 0.3);
+    background: linear-gradient(135deg, rgba(37, 99, 235, 0.06) 0%, var(--bg-card) 100%);
   }
-  
-  .quick-action-card:hover::before {
-    left: 100%;
+
+  .quick-action-card--primary .action-icon {
+    background: var(--accent-color);
+    box-shadow: 0 4px 12px rgba(37, 99, 235, 0.35);
   }
-  
+
   .quick-action-card:hover {
-    background: #e9ecef;
-    border-color: var(--primary-color, #789170);
+    border-color: var(--accent-light);
     transform: translateY(-2px);
-    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+    box-shadow: var(--shadow-md);
   }
-  
+
   .action-icon {
-    background: var(--primary-color, #789170);
+    background: var(--primary-color);
     color: white;
     border-radius: 8px;
     padding: 12px;
@@ -531,13 +551,13 @@
   
   .quick-stat-card:hover {
     background: #e9ecef;
-    border-color: var(--primary-color, #789170);
+    border-color: var(--primary-color, #16786a);
     transform: translateY(-2px);
     box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
   }
   
   .quick-stat-icon {
-    background: var(--primary-color, #789170);
+    background: var(--primary-color, #16786a);
     color: white;
     border-radius: 8px;
     padding: 12px;

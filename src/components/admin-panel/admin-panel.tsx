@@ -504,7 +504,7 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({ onClose, initialTab }) =
                   display: "flex",
                   alignItems: "center",
                   gap: "0.5rem",
-                  backgroundColor: "#789170",
+                  backgroundColor: "#16786a",
                   marginRight: 0,
                   marginBottom: 0,
                   color: "white",
@@ -1213,7 +1213,7 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({ onClose, initialTab }) =
                   </button>
                   <button
                     onClick={handleCreateUser}
-                    style={{ backgroundColor: "#789170", color: "white" }}
+                    style={{ backgroundColor: "#16786a", color: "white" }}
                     disabled={isCreatingUser}
                   >
                     {isCreatingUser ? translations.creating : translations.createUser}

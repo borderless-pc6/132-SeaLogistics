@@ -7,9 +7,11 @@ import {
   Clock,
   MapPin,
   Package,
+  Plus,
   Settings,
   Ship,
   TrendingUp,
+  Users,
 } from "lucide-react";
 import { useCallback, useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
@@ -41,7 +43,7 @@ interface RecentActivity {
 }
 
 export const Dashboard = () => {
-  const { currentUser, isAdmin } = useAuth();
+  const { currentUser, isAdmin, canCreateShipment, canManageEmployees } = useAuth();
   const { shipments, loading } = useShipments();
   const { translations } = useLanguage();
   const navigate = useNavigate();
@@ -361,6 +363,17 @@ export const Dashboard = () => {
             <div className="quick-actions-section">
               <h2 className="section-title">{translations.quickActions}</h2>
               <div className="quick-actions-grid">
+                {canCreateShipment() && (
+                  <a href="/novo-envio" className="quick-action-card quick-action-card--primary">
+                    <div className="action-icon">
+                      <Plus size={24} />
+                    </div>
+                    <div className="action-content">
+                      <h3>{translations.novoEnvio}</h3>
+                      <p>Solicitar um novo envio</p>
+                    </div>
+                  </a>
+                )}
                 <a href="/envios" className="quick-action-card">
                   <div className="action-icon">
                     <Ship size={24} />
@@ -370,6 +383,17 @@ export const Dashboard = () => {
                     <p>{translations.manageShipments}</p>
                   </div>
                 </a>
+                {canManageEmployees() && (
+                  <a href="/equipe" className="quick-action-card">
+                    <div className="action-icon">
+                      <Users size={24} />
+                    </div>
+                    <div className="action-content">
+                      <h3>Equipe</h3>
+                      <p>Gerenciar funcionários da empresa</p>
+                    </div>
+                  </a>
+                )}
                 <a href="/settings" className="quick-action-card">
                   <div className="action-icon">
                     <Settings size={24} />

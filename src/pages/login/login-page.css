@@ -14,29 +14,16 @@
   position: absolute;
   inset: 0;
   background:
-    radial-gradient(ellipse 70% 60% at 10% 20%, rgba(61, 186, 140, 0.15) 0%, transparent 55%),
-    radial-gradient(ellipse 50% 50% at 90% 80%, rgba(30, 77, 71, 0.2) 0%, transparent 50%);
-  pointer-events: none;
-}
-
-.login-container::after {
-  content: "";
-  position: absolute;
-  bottom: 0;
-  left: 0;
-  right: 0;
-  height: 200px;
-  background: linear-gradient(to top, rgba(0, 0, 0, 0.15), transparent);
+    linear-gradient(135deg, rgba(37, 99, 235, 0.15) 0%, transparent 50%),
+    radial-gradient(ellipse 60% 50% at 100% 100%, rgba(249, 115, 22, 0.12) 0%, transparent 55%);
   pointer-events: none;
 }
 
 .login-card {
-  background: rgba(255, 255, 255, 0.97);
-  backdrop-filter: blur(20px);
-  -webkit-backdrop-filter: blur(20px);
+  background: var(--white);
   border-radius: var(--radius-xl);
   box-shadow: var(--shadow-xl);
-  border: 1px solid rgba(255, 255, 255, 0.6);
+  border: 1px solid var(--border-color);
   width: 100%;
   max-width: 440px;
   max-height: 92vh;

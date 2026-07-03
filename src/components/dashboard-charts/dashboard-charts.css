@@ -218,7 +218,7 @@
 }
 
 .stat-icon.total {
-  background: var(--primary-color, #315851);
+  background: var(--primary-color, #16786a);
 }
 
 .stat-icon.completed {
@@ -322,7 +322,7 @@
 
 .filter-group select:focus {
   outline: none;
-  border-color: var(--primary-color, #315851);
+  border-color: var(--primary-color, #16786a);
   box-shadow: 0 0 0 3px rgba(49, 88, 81, 0.1);
 }
 
@@ -366,14 +366,14 @@
 }
 
 .loading-charts svg {
-  color: var(--primary-color, #315851);
+  color: var(--primary-color, #16786a);
   margin-bottom: 1rem;
   animation: bounce 1s infinite;
 }
 
 .loading-charts h3 {
   margin: 0 0 0.5rem 0;
-  color: var(--primary-color, #315851);
+  color: var(--primary-color, #16786a);
   font-size: 1.2rem;
   font-weight: 600;
 }

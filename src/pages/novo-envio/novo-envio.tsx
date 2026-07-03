@@ -4,10 +4,9 @@ import type React from "react";
 
 import { collection, getDocs, query, where } from "firebase/firestore";
 import { FileText, MapPin, Package, User } from "lucide-react";
-import { useContext, useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import Navbar from "../../components/navbar/navbar";
-import { NavbarContext } from "../../components/navbar/navbar-context";
 import { useAuth } from "../../context/auth-context";
 import { useLanguage } from "../../context/language-context";
 import { useShipments } from "../../context/shipments-context";
@@ -51,16 +50,15 @@ interface NovoEnvio {
 const NovoEnvioPage = () => {
   const navigate = useNavigate();
   const { addShipment } = useShipments();
-  const { isStaff } = useAuth();
-  const { isCollapsed } = useContext(NavbarContext);
+  const { canCreateShipment, isStaff, isCompanyUser, currentUser, currentCompany } = useAuth();
   const { translations } = useLanguage();
   const { showError, showSuccess } = useToast();
 
   useEffect(() => {
-    if (!isStaff()) {
+    if (!canCreateShipment()) {
       navigate("/home");
     }
-  }, [isStaff, navigate]);
+  }, [canCreateShipment, navigate]);
 
   const [formData, setFormData] = useState<NovoEnvio>({
     clienteId: "",
@@ -103,6 +101,8 @@ const NovoEnvioPage = () => {
   }, [formData.tipo]);
 
   useEffect(() => {
+    if (!isStaff()) return;
+
     const fetchClientes = async () => {
       setLoadingClientes(true);
       try {
@@ -133,7 +133,7 @@ const NovoEnvioPage = () => {
       }
     };
     fetchClientes();
-  }, []);
+  }, [isStaff]);
 
   // Buscar operadores admins do Firestore
   useEffect(() => {
@@ -252,7 +252,7 @@ const NovoEnvioPage = () => {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
 
-    if (!isStaff()) {
+    if (!canCreateShipment()) {
       showError("Erro: Você não tem permissão para criar envios.");
       return;
     }
@@ -266,27 +266,43 @@ const NovoEnvioPage = () => {
     setIsSubmitting(true);
 
     try {
-      const clienteSelecionado = clientes.find(
-        (c) => c.id === formData.clienteId
-      );
+      let clienteEmpresa = "";
+      let companyId: string | undefined;
 
-      if (!clienteSelecionado) {
-        showError(translations.pleaseSelectValidClient);
-        setIsSubmitting(false);
-        return;
-      }
-
-      // Para o envio aparecer no perfil do cliente, ele precisa ter companyId
-      if (!clienteSelecionado.companyId) {
-        showError(
-          "Este cliente não tem empresa vinculada. O envio não aparecerá no perfil dele. Vincule uma empresa ao usuário nas configurações."
+      if (isCompanyUser()) {
+        if (!currentUser?.companyId) {
+          showError("Sua conta não está vinculada a uma empresa. Contate o suporte.");
+          setIsSubmitting(false);
+          return;
+        }
+        clienteEmpresa =
+          currentCompany?.name || currentUser.companyName || "Minha empresa";
+        companyId = currentUser.companyId;
+      } else {
+        const clienteSelecionado = clientes.find(
+          (c) => c.id === formData.clienteId
         );
-        setIsSubmitting(false);
-        return;
+
+        if (!clienteSelecionado) {
+          showError(translations.pleaseSelectValidClient);
+          setIsSubmitting(false);
+          return;
+        }
+
+        if (!clienteSelecionado.companyId) {
+          showError(
+            "Este cliente não tem empresa vinculada. O envio não aparecerá no perfil dele. Vincule uma empresa ao usuário nas configurações."
+          );
+          setIsSubmitting(false);
+          return;
+        }
+
+        clienteEmpresa = clienteSelecionado.empresa;
+        companyId = clienteSelecionado.companyId;
       }
 
       const shipmentData = {
-        cliente: clienteSelecionado.empresa,
+        cliente: clienteEmpresa,
         operador: formData.operador,
         pol: formData.pol,
         pod: formData.pod,
@@ -298,9 +314,9 @@ const NovoEnvioPage = () => {
         numeroBl: formData.numeroBl,
         armador: formData.armador,
         booking: formData.booking,
-        companyId: clienteSelecionado.companyId,
+        companyId,
         invoice: formData.invoice,
-        shipper: "",
+        shipper: formData.shipper || clienteEmpresa,
         tipo: formData.tipo,
       };
 
@@ -326,7 +342,7 @@ const NovoEnvioPage = () => {
         shipper: "",
       });
 
-      navigate("/home");
+      navigate("/envios");
     } catch (error) {
       console.error("Erro ao criar shipment:", error);
       showError("Erro ao criar shipment. Tente novamente.");
@@ -335,108 +351,109 @@ const NovoEnvioPage = () => {
     }
   };
 
-  if (!isStaff()) {
-    return (
-      <main className="novo-envio-main">
-        <Navbar />
-        <div
-          className={`novo-envio-content ${
-            isCollapsed ? "navbar-collapsed" : ""
-          }`}
-        >
-          <div className="novo-envio-container">
-            <div className="access-denied">
-              <h2>Acesso Negado</h2>
-              <p>
-                Apenas administradores e operadores podem criar novos envios.
-              </p>
-            </div>
-          </div>
-        </div>
-      </main>
-    );
+  if (!canCreateShipment()) {
+    return null;
   }
 
+  const empresaNome =
+    currentCompany?.name || currentUser?.companyName || "Sua empresa";
+
   return (
-    <main className="novo-envio-container">
+    <main className="novo-envio-container page-layout">
       <Navbar />
-      <div
-        className={`novo-envio-content ${
-          isCollapsed ? "navbar-collapsed" : ""
-        }`}
-      >
+      <div className="novo-envio-content page-content">
         <div className="page-header">
+          <span className="page-header__eyebrow">
+            <Package size={14} /> {isCompanyUser() ? "Solicitar envio" : "Novo registro"}
+          </span>
           <h1>{translations.newShipmentTitle}</h1>
-          <p>Preencha as informações para criar um novo envio</p>
-        </div>
-
-        {/* Seção Tipo de Envio */}
-        <div className="form-section">
-          <div className="section-header">
-            <Package size={20} />
-            <h2>Tipo de Envio</h2>
-          </div>
-
-          <div className="form-row">
-            <div className="form-group">
-              <label htmlFor="tipo">
-                <Package
-                  size={16}
-                  style={{ marginRight: "8px", verticalAlign: "middle" }}
-                />
-                Tipo de Transporte *
-              </label>
-              <select
-                id="tipo"
-                name="tipo"
-                value={formData.tipo}
-                onChange={handleInputChange}
-                onBlur={() => handleBlur('tipo')}
-                className={errors.tipo ? 'input-error' : ''}
-                required
-              >
-                <option value="">Selecione o tipo de transporte</option>
-                <option value="Marítimo">Marítimo</option>
-                <option value="Aéreo">Aéreo</option>
-                <option value="Terrestre">Terrestre</option>
-              </select>
-              {errors.tipo && <span className="error-text">{errors.tipo}</span>}
-            </div>
-          </div>
+          <p>
+            {isCompanyUser()
+              ? "Preencha os dados da sua carga. Nossa equipe dará sequência ao processo."
+              : "Preencha as informações para criar um novo envio"}
+          </p>
         </div>
 
         <div className="form-container">
           <form onSubmit={handleSubmit} className="novo-envio-form">
-            {/* Seção Cliente e Operador */}
+            {/* Seção Tipo de Envio */}
             <div className="form-section">
               <div className="section-header">
-                <User size={20} />
-                <h2>Cliente e Operador</h2>
+                <Package size={20} />
+                <h2>Tipo de Envio</h2>
               </div>
 
               <div className="form-row">
                 <div className="form-group">
-                  <label htmlFor="clienteId">Cliente *</label>
+                  <label htmlFor="tipo">
+                    <Package
+                      size={16}
+                      style={{ marginRight: "8px", verticalAlign: "middle" }}
+                    />
+                    Tipo de Transporte *
+                  </label>
                   <select
-                    id="clienteId"
-                    name="clienteId"
-                    value={formData.clienteId}
+                    id="tipo"
+                    name="tipo"
+                    value={formData.tipo}
                     onChange={handleInputChange}
+                    onBlur={() => handleBlur('tipo')}
+                    className={errors.tipo ? 'input-error' : ''}
                     required
-                    disabled={loadingClientes}
                   >
-                    <option value="">
-                      {loadingClientes
-                        ? translations.loading
-                        : translations.selectClient}
-                    </option>
-                    {clientes.map((cliente) => (
-                      <option key={cliente.id} value={cliente.id}>
-                        {cliente.nome} - {cliente.empresa}
-                      </option>
-                    ))}
+                    <option value="">Selecione o tipo de transporte</option>
+                    <option value="Marítimo">Marítimo</option>
+                    <option value="Aéreo">Aéreo</option>
+                    <option value="Terrestre">Terrestre</option>
                   </select>
+                  {errors.tipo && <span className="error-text">{errors.tipo}</span>}
                 </div>
+              </div>
+            </div>
+
+            {/* Seção Cliente e Operador */}
+            <div className="form-section">
+              <div className="section-header">
+                <User size={20} />
+                <h2>{isCompanyUser() ? "Empresa e Operador" : "Cliente e Operador"}</h2>
+              </div>
+
+              <div className="form-row">
+                {isCompanyUser() ? (
+                  <div className="form-group">
+                    <label htmlFor="empresa">Empresa</label>
+                    <input
+                      type="text"
+                      id="empresa"
+                      value={empresaNome}
+                      disabled
+                      className="input-readonly"
+                    />
+                  </div>
+                ) : (
+                  <div className="form-group">
+                    <label htmlFor="clienteId">Cliente *</label>
+                    <select
+                      id="clienteId"
+                      name="clienteId"
+                      value={formData.clienteId}
+                      onChange={handleInputChange}
+                      required
+                      disabled={loadingClientes}
+                    >
+                      <option value="">
+                        {loadingClientes
+                          ? translations.loading
+                          : translations.selectClient}
+                      </option>
+                      {clientes.map((cliente) => (
+                        <option key={cliente.id} value={cliente.id}>
+                          {cliente.nome} - {cliente.empresa}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                )}
 
                 <div className="form-group">
                   <label htmlFor="operador">Operador *</label>

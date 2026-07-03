@@ -31,7 +31,7 @@
   align-items: center;
   padding: 1.5rem 2rem;
   border-bottom: 1px solid #e9ecef;
-  background: linear-gradient(135deg, #315851 0%, #4a7c59 100%);
+  background: linear-gradient(135deg, #16786a 0%, #24d4a0 100%);
   color: white;
 }
 
@@ -122,14 +122,14 @@
   padding: 0.75rem 1rem;
   background: #f7fafc;
   border-radius: 8px;
-  border-left: 4px solid #315851;
+  border-left: 4px solid #16786a;
   display: flex;
   align-items: center;
   gap: 0.5rem;
 }
 
 .document-count {
-  background: #315851;
+  background: #16786a;
   color: white;
   padding: 0.25rem 0.5rem;
   border-radius: 12px;
@@ -156,7 +156,7 @@
 }
 
 .document-item:hover {
-  border-color: #315851;
+  border-color: #16786a;
   box-shadow: 0 2px 8px rgba(49, 88, 81, 0.1);
 }
 
@@ -168,7 +168,7 @@
 }
 
 .document-icon {
-  color: #315851;
+  color: #16786a;
   flex-shrink: 0;
 }
 

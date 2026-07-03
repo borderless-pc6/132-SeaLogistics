@@ -53,7 +53,7 @@
   align-items: center;
   padding: 1.5rem 2rem;
   border-bottom: 1px solid #e9ecef;
-  background: linear-gradient(135deg, #315851 0%, #4a7c59 100%);
+  background: linear-gradient(135deg, #16786a 0%, #24d4a0 100%);
   color: white;
 }
 
@@ -149,7 +149,7 @@
 
 .document-type-selector select:focus {
   outline: none;
-  border-color: #315851;
+  border-color: #16786a;
 }
 
 /* Área de Upload */
@@ -165,12 +165,12 @@
 }
 
 .upload-area:hover {
-  border-color: #315851;
+  border-color: #16786a;
   background: #edf2f7;
 }
 
 .upload-area.drag-active {
-  border-color: #315851;
+  border-color: #16786a;
   background: #e6fffa;
   transform: scale(1.02);
 }
@@ -190,7 +190,7 @@
 }
 
 .upload-icon {
-  color: #315851;
+  color: #16786a;
   margin-bottom: 1rem;
 }
 
@@ -271,7 +271,7 @@
 .upload-button {
   width: 100%;
   padding: 1rem;
-  background: linear-gradient(135deg, #315851 0%, #4a7c59 100%);
+  background: linear-gradient(135deg, #16786a 0%, #24d4a0 100%);
   color: white;
   border: none;
   border-radius: 8px;
@@ -349,7 +349,7 @@
 
 .progress-fill {
   height: 100%;
-  background: linear-gradient(90deg, #315851 0%, #4a7c59 100%);
+  background: linear-gradient(90deg, #16786a 0%, #24d4a0 100%);
   transition: width 0.3s ease;
 }
 
@@ -405,7 +405,7 @@
   padding: 0.75rem 1rem;
   background: #f7fafc;
   border-radius: 8px;
-  border-left: 4px solid #315851;
+  border-left: 4px solid #16786a;
 }
 
 .document-list {
@@ -426,7 +426,7 @@
 }
 
 .document-item:hover {
-  border-color: #315851;
+  border-color: #16786a;
   box-shadow: 0 2px 8px rgba(49, 88, 81, 0.1);
 }
 

@@ -67,7 +67,7 @@
 }
 
 .edit-modal-header svg {
-  color: #789170;
+  color: #16786a;
 }
 
 .close-button {
@@ -119,7 +119,7 @@
 }
 
 .section-title svg {
-  color: #789170;
+  color: #16786a;
 }
 
 .form-row {
@@ -165,8 +165,8 @@
 .form-group select:focus,
 .form-group textarea:focus {
   outline: none;
-  border-color: #789170;
-  box-shadow: 0 0 0 3px rgba(120, 145, 112, 0.1);
+  border-color: #16786a;
+  box-shadow: 0 0 0 3px rgba(22, 120, 106, 0.1);
 }
 
 .form-group textarea {
@@ -225,15 +225,15 @@
 }
 
 .btn-save {
-  background: #789170;
+  background: #16786a;
   color: white;
-  box-shadow: 0 2px 8px rgba(120, 145, 112, 0.2);
+  box-shadow: 0 2px 8px rgba(22, 120, 106, 0.2);
 }
 
 .btn-save:hover:not(:disabled) {
   background: #5a6e55;
   transform: translateY(-1px);
-  box-shadow: 0 4px 12px rgba(120, 145, 112, 0.3);
+  box-shadow: 0 4px 12px rgba(22, 120, 106, 0.3);
 }
 
 .btn-save:disabled {
