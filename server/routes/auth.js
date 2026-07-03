@@ -11,7 +11,8 @@ const router = express.Router();
 
 router.post("/login", async (req, res) => {
   try {
-    const { email, password } = req.body;
+    const email = (req.body.email || "").trim().toLowerCase();
+    const { password } = req.body;
 
     if (!email || !password) {
       return res
@@ -209,6 +210,58 @@ router.post("/register-admin", async (req, res) => {
     });
   } catch (error) {
     console.error("Erro no cadastro de administrador:", error);
+    res.status(500).json({ success: false, error: error.message });
+  }
+});
+
+router.post("/provision-user", async (req, res) => {
+  try {
+    const uid = req.body.uid;
+    const email = (req.body.email || "").trim().toLowerCase();
+    const password = req.body.password;
+    const displayName = (req.body.displayName || "").trim();
+
+    if (!uid || !email || !password) {
+      return res.status(400).json({
+        success: false,
+        error: "uid, email e password são obrigatórios",
+      });
+    }
+
+    if (!isFirebaseAdminReady()) {
+      return res.status(503).json({
+        success: false,
+        error: "Firebase Admin não configurado",
+      });
+    }
+
+    const auth = getAuth();
+
+    try {
+      await auth.getUser(uid);
+      await auth.updateUser(uid, {
+        email,
+        password,
+        displayName: displayName || undefined,
+        disabled: false,
+      });
+    } catch (error) {
+      if (error.code === "auth/user-not-found") {
+        await auth.createUser({
+          uid,
+          email,
+          password,
+          displayName: displayName || undefined,
+          disabled: false,
+        });
+      } else {
+        throw error;
+      }
+    }
+
+    res.json({ success: true });
+  } catch (error) {
+    console.error("Erro ao provisionar usuário Firebase:", error);
     res.status(500).json({ success: false, error: error.message });
   }
 });
