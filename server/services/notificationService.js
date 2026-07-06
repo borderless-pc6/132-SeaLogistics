@@ -5,6 +5,12 @@ const {
   renderPushTemplate,
   getStatusLabel,
 } = require("./templateService");
+const {
+  buildJabilEmailSubject,
+  renderJabilEmailHtml,
+  renderJabilWhatsAppText,
+  isInternationalShipmentModel,
+} = require("./jabilEmailTemplate");
 const { sendPushToCompanyUsers } = require("./pushNotificationService");
 
 const DEFAULT_PREFERENCES = {
@@ -84,11 +90,20 @@ async function sendClientStatusUpdateNotification(shipment, oldStatus) {
 
   if (contact.preferences.email && contact.email) {
     try {
-      const { subject, html } = await renderEmailTemplate(
-        "status_update_email",
-        shipment,
-        { oldStatus }
-      );
+      let subject;
+      let html;
+      if (isInternationalShipmentModel(shipment)) {
+        subject = buildJabilEmailSubject(shipment);
+        html = renderJabilEmailHtml(shipment);
+      } else {
+        const rendered = await renderEmailTemplate(
+          "status_update_email",
+          shipment,
+          { oldStatus }
+        );
+        subject = rendered.subject;
+        html = rendered.html;
+      }
       await sendEmail({ to: contact.email, subject, html });
       results.email = true;
     } catch (error) {
@@ -98,11 +113,9 @@ async function sendClientStatusUpdateNotification(shipment, oldStatus) {
 
   if (contact.preferences.push) {
     try {
-      const body = await renderPushTemplate(
-        "status_update_push",
-        shipment,
-        { oldStatus }
-      );
+      const body = isInternationalShipmentModel(shipment)
+        ? renderJabilWhatsAppText(shipment)
+        : await renderPushTemplate("status_update_push", shipment, { oldStatus });
       const pushResult = await sendPushToCompanyUsers(
         shipment.companyId,
         contact.preferences,
@@ -142,10 +155,16 @@ async function sendClientShipmentNotification(shipment) {
 
   if (contact.preferences.email && contact.email) {
     try {
-      const { subject, html } = await renderEmailTemplate(
-        "new_shipment_email",
-        shipment
-      );
+      let subject;
+      let html;
+      if (isInternationalShipmentModel(shipment)) {
+        subject = buildJabilEmailSubject(shipment);
+        html = renderJabilEmailHtml(shipment);
+      } else {
+        const rendered = await renderEmailTemplate("new_shipment_email", shipment);
+        subject = rendered.subject;
+        html = rendered.html;
+      }
       await sendEmail({ to: contact.email, subject, html });
       results.email = true;
     } catch (error) {
@@ -155,7 +174,9 @@ async function sendClientShipmentNotification(shipment) {
 
   if (contact.preferences.push) {
     try {
-      const body = await renderPushTemplate("new_shipment_push", shipment);
+      const body = isInternationalShipmentModel(shipment)
+        ? renderJabilWhatsAppText(shipment)
+        : await renderPushTemplate("new_shipment_push", shipment);
       const pushResult = await sendPushToCompanyUsers(
         shipment.companyId,
         contact.preferences,

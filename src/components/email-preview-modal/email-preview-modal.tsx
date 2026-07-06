@@ -1,11 +1,13 @@
 "use client";
 
-import { X } from "lucide-react";
+import { Copy, Mail, MessageCircle, X } from "lucide-react";
+import { useState } from "react";
 import { createPortal } from "react-dom";
 import type { Shipment } from "../../context/shipments-context";
 import {
   buildJabilEmailSubject,
   renderJabilEmailHtml,
+  renderJabilWhatsAppText,
 } from "../../services/jabilEmailTemplate";
 import "./email-preview-modal.css";
 
@@ -14,12 +16,28 @@ interface EmailPreviewModalProps {
   onClose: () => void;
 }
 
+type PreviewTab = "email" | "whatsapp";
+
 export function EmailPreviewModal({ shipment, onClose }: EmailPreviewModalProps) {
+  const [tab, setTab] = useState<PreviewTab>("email");
+  const [copied, setCopied] = useState(false);
+
   const html = renderJabilEmailHtml(shipment);
   const subject = buildJabilEmailSubject(shipment);
+  const whatsappText = renderJabilWhatsAppText(shipment);
 
   const handleOverlayClick = (e: React.MouseEvent) => {
     if (e.target === e.currentTarget) onClose();
+  };
+
+  const handleCopyWhatsApp = async () => {
+    try {
+      await navigator.clipboard.writeText(whatsappText);
+      setCopied(true);
+      setTimeout(() => setCopied(false), 2000);
+    } catch {
+      // ignore
+    }
   };
 
   return createPortal(
@@ -27,22 +45,57 @@ export function EmailPreviewModal({ shipment, onClose }: EmailPreviewModalProps)
       <div className="email-preview-content">
         <div className="email-preview-header">
           <div>
-            <h2>Preview — E-mail JABIL</h2>
-            <p className="email-preview-subject">{subject}</p>
+            <h2>Preview — Comunicação internacional</h2>
+            {tab === "email" && (
+              <p className="email-preview-subject">{subject}</p>
+            )}
           </div>
           <button type="button" className="email-preview-close" onClick={onClose}>
             <X size={20} />
           </button>
         </div>
-        <div className="email-preview-body">
-          <iframe
-            title="Preview e-mail"
-            srcDoc={html}
-            className="email-preview-iframe"
-          />
+
+        <div className="email-preview-tabs">
+          <button
+            type="button"
+            className={tab === "email" ? "active" : ""}
+            onClick={() => setTab("email")}
+          >
+            <Mail size={16} /> E-mail
+          </button>
+          <button
+            type="button"
+            className={tab === "whatsapp" ? "active" : ""}
+            onClick={() => setTab("whatsapp")}
+          >
+            <MessageCircle size={16} /> WhatsApp
+          </button>
         </div>
+
+        <div className="email-preview-body">
+          {tab === "email" ? (
+            <iframe
+              title="Preview e-mail"
+              srcDoc={html}
+              className="email-preview-iframe"
+            />
+          ) : (
+            <div className="whatsapp-preview-panel">
+              <pre className="whatsapp-preview-text">{whatsappText}</pre>
+              <button
+                type="button"
+                className="whatsapp-copy-btn"
+                onClick={handleCopyWhatsApp}
+              >
+                <Copy size={16} />
+                {copied ? "Copiado!" : "Copiar texto"}
+              </button>
+            </div>
+          )}
+        </div>
+
         <p className="email-preview-note">
-          Preview local — o envio real usa o servidor de e-mail quando configurado.
+          Modelo alinhado ao padrão JABIL — e-mail e mensagem de embarque internacional.
         </p>
       </div>
     </div>,

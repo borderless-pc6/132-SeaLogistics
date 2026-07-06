@@ -43,6 +43,7 @@ interface FormData {
   actualDeparture: string;
   reportedEta: string;
   navio: string;
+  navioCodigo: string;
   containerType: string;
   cargoReady: string;
   coleta: string;
@@ -50,6 +51,9 @@ interface FormData {
   readyToLoad: string;
   loadedOnBoard: string;
   destinoRumo: string;
+  etaRumo: string;
+  shipMapImageUrl: string;
+  ce: string;
 }
 
 const STATUS_OPTIONS = [
@@ -95,6 +99,7 @@ const EditShipmentModal = ({
     actualDeparture: "",
     reportedEta: "",
     navio: "",
+    navioCodigo: "",
     containerType: "40HC",
     cargoReady: "",
     coleta: "",
@@ -102,6 +107,9 @@ const EditShipmentModal = ({
     readyToLoad: "",
     loadedOnBoard: "",
     destinoRumo: "",
+    etaRumo: "",
+    shipMapImageUrl: "",
+    ce: "",
   });
 
   const [isLoading, setIsLoading] = useState(false);
@@ -244,6 +252,7 @@ const EditShipmentModal = ({
         actualDeparture: shipment.actualDeparture || "",
         reportedEta: shipment.reportedEta || "",
         navio: shipment.navio || "",
+        navioCodigo: shipment.navioCodigo || "",
         containerType: shipment.containerType || "40HC",
         cargoReady: shipment.cargoReady || "",
         coleta: shipment.coleta || "",
@@ -251,6 +260,9 @@ const EditShipmentModal = ({
         readyToLoad: shipment.readyToLoad || "",
         loadedOnBoard: shipment.loadedOnBoard || "",
         destinoRumo: shipment.destinoRumo || "",
+        etaRumo: shipment.etaRumo || "",
+        shipMapImageUrl: shipment.shipMapImageUrl || "",
+        ce: shipment.ce || "",
       };
       console.log("FormData configurado:", newFormData);
       setFormData(newFormData);
@@ -387,6 +399,7 @@ const EditShipmentModal = ({
         actualDeparture: formData.actualDeparture,
         reportedEta: formData.reportedEta,
         navio: formData.navio,
+        navioCodigo: formData.navioCodigo,
         containerType: formData.containerType,
         cargoReady: formData.cargoReady,
         coleta: formData.coleta,
@@ -394,6 +407,9 @@ const EditShipmentModal = ({
         readyToLoad: formData.readyToLoad,
         loadedOnBoard: formData.loadedOnBoard,
         destinoRumo: formData.destinoRumo,
+        etaRumo: formData.etaRumo,
+        shipMapImageUrl: formData.shipMapImageUrl,
+        ce: formData.ce,
         companyId: selectedCliente?.companyId ?? shipment.companyId,
         updatedAt: new Date(),
       };
@@ -801,6 +817,20 @@ const EditShipmentModal = ({
                   />
                 </div>
                 <div className="form-group">
+                  <label htmlFor="navioCodigo">Código do navio</label>
+                  <input
+                    type="text"
+                    id="navioCodigo"
+                    name="navioCodigo"
+                    value={formData.navioCodigo}
+                    onChange={handleInputChange}
+                    disabled={!canEdit}
+                    placeholder="Ex: 0PPKKE2MA"
+                  />
+                </div>
+              </div>
+              <div className="form-row">
+                <div className="form-group">
                   <label htmlFor="containerType">Tipo de contêiner</label>
                   <select
                     id="containerType"
@@ -815,6 +845,18 @@ const EditShipmentModal = ({
                       </option>
                     ))}
                   </select>
+                </div>
+                <div className="form-group">
+                  <label htmlFor="shipMapImageUrl">URL foto/mapa do navio</label>
+                  <input
+                    type="url"
+                    id="shipMapImageUrl"
+                    name="shipMapImageUrl"
+                    value={formData.shipMapImageUrl}
+                    onChange={handleInputChange}
+                    disabled={!canEdit}
+                    placeholder="https://..."
+                  />
                 </div>
               </div>
               <div className="form-row">
@@ -889,6 +931,17 @@ const EditShipmentModal = ({
                     placeholder="Ex: Qingdao"
                   />
                 </div>
+                <div className="form-group">
+                  <label htmlFor="etaRumo">Chegada em (rumo a)</label>
+                  <input
+                    type="date"
+                    id="etaRumo"
+                    name="etaRumo"
+                    value={formData.etaRumo}
+                    onChange={handleInputChange}
+                    disabled={!canEdit}
+                  />
+                </div>
               </div>
             </div>
 
@@ -930,6 +983,21 @@ const EditShipmentModal = ({
                   {errors.booking && (
                     <span className="error-message">{errors.booking}</span>
                   )}
+                </div>
+              </div>
+
+              <div className="form-row">
+                <div className="form-group">
+                  <label htmlFor="ce">CE (Conhecimento de Embarque)</label>
+                  <input
+                    type="text"
+                    id="ce"
+                    name="ce"
+                    value={formData.ce}
+                    onChange={handleInputChange}
+                    disabled={!canEdit}
+                    placeholder="A INFORMAR"
+                  />
                 </div>
               </div>
 

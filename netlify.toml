@@ -4,7 +4,7 @@
 
 [[redirects]]
   from = "/api/*"
-  to = "https://one32-sealogistics.onrender.com/api/:splat"
+  to = "https://one32-sealogistics-xsh4.onrender.com/api/:splat"
   status = 200
   force = true
 
@@ -14,7 +14,7 @@
   status = 200
 
 [build.environment]
-  # Estas variáveis devem ser configuradas no painel do Netlify
+  VITE_BACKEND_URL = "https://one32-sealogistics-xsh4.onrender.com"
+  VITE_EMAIL_SERVER_URL = "https://one32-sealogistics-xsh4.onrender.com"
   # VITE_AZURE_CLIENT_ID = "21f52d49-5e17-4d39-b05c-8a3f355ecbc9"
   # VITE_AZURE_REDIRECT_URI será gerada dinamicamente
-  # VITE_BACKEND_URL = "https://one32-sealogistics.onrender.com"

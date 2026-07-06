@@ -53,8 +53,10 @@ export interface Shipment {
   imo?: string;
   actualDeparture?: string;
   reportedEta?: string;
-  /** Nome/código do navio (ex: CMA CGM VELA) */
+  /** Nome do navio (ex: CMA CGM VELA) */
   navio?: string;
+  /** Código de rastreio do navio (ex: 0PPKKE2MA) */
+  navioCodigo?: string;
   /** Tipo de container (20GP, 40HC, etc.) */
   containerType?: string;
   cargoReady?: string;
@@ -64,6 +66,12 @@ export interface Shipment {
   loadedOnBoard?: string;
   /** Porto/cidade rumo a (complemento de localização) */
   destinoRumo?: string;
+  /** ETA no porto de destino intermediário (chegada em "rumo a") */
+  etaRumo?: string;
+  /** URL da imagem de posição do navio (mapa/foto enviada ao cliente) */
+  shipMapImageUrl?: string;
+  /** CE — Conhecimento de Embarque / despacho aduaneiro */
+  ce?: string;
   createdAt?: Timestamp | Date;
   updatedAt?: Timestamp | Date;
 }
@@ -101,13 +109,24 @@ export const ShipmentsProvider: React.FC<ShipmentsProviderProps> = ({
 }) => {
   const [shipments, setShipments] = useState<Shipment[]>([]);
   const [loading, setLoading] = useState(true);
-  const { currentUser, isAdmin } = useAuth();
+  const { currentUser, isAdmin, firebaseReady } = useAuth();
 
   useEffect(() => {
     if (!currentUser) {
       setShipments([]);
       setLoading(false);
-      return;
+      return undefined;
+    }
+
+    if (!firebaseReady) {
+      setShipments([]);
+      setLoading(true);
+
+      const timeout = setTimeout(() => {
+        setLoading(false);
+      }, 15000);
+
+      return () => clearTimeout(timeout);
     }
 
     let q;
@@ -151,7 +170,7 @@ export const ShipmentsProvider: React.FC<ShipmentsProviderProps> = ({
         console.error("Error fetching shipments:", error);
         if (error.code === "permission-denied") {
           console.error(
-            "Permissão negada no Firestore. Faça logout e login novamente com o backend rodando (FIREBASE_SERVICE_ACCOUNT configurado)."
+            "Permissão negada no Firestore. Faça logout e login novamente."
           );
         }
         setLoading(false);
@@ -159,7 +178,7 @@ export const ShipmentsProvider: React.FC<ShipmentsProviderProps> = ({
     );
 
     return () => unsubscribe();
-  }, [currentUser, isAdmin]);
+  }, [currentUser, isAdmin, firebaseReady]);
 
   const addShipment = async (
     shipmentData: Omit<Shipment, "id" | "createdAt" | "companyId"> & {

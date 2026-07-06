@@ -26,7 +26,7 @@ import {
 } from "../../utils/adminCode";
 import { hashPassword } from "../../utils/passwordUtils";
 import { PasswordStrengthIndicator } from "../password-strength-indicator";
-import LanguageSwitcher from "../language-switcher/language-switcher";
+import { PasswordInput } from "../password-input/password-input";
 import logo2 from "./../../assets/logo2.png";
 import "./register-split.css";
 
@@ -341,9 +341,8 @@ export default function RegisterSplit() {
           {isCreatingAdmin && (
             <div className="split-form-group">
               <label htmlFor="adminCode">{translations.adminCode}</label>
-              <input
+              <PasswordInput
                 id="adminCode"
-                type="password"
                 value={adminCode}
                 onChange={(e) => setAdminCode(e.target.value)}
                 placeholder={translations.adminCodePlaceholder}
@@ -357,9 +356,8 @@ export default function RegisterSplit() {
           <div className="split-password-grid">
             <div className="split-form-group">
               <label htmlFor="password">{translations.password}</label>
-              <input
+              <PasswordInput
                 id="password"
-                type="password"
                 value={userCredentials.password}
                 onChange={(e) =>
                   setUserCredentials({
@@ -370,7 +368,9 @@ export default function RegisterSplit() {
                 onBlur={() => handleBlur('password')}
                 placeholder={translations.passwordPlaceholder}
                 className={errors.password ? 'input-error' : ''}
+                hasError={Boolean(errors.password)}
                 required
+                autoComplete="new-password"
               />
               <PasswordStrengthIndicator 
                 password={userCredentials.password}
@@ -385,9 +385,8 @@ export default function RegisterSplit() {
               <label htmlFor="confirm-password">
                 {translations.confirmPassword}
               </label>
-              <input
+              <PasswordInput
                 id="confirm-password"
-                type="password"
                 value={userCredentials.confirmPassword}
                 onChange={(e) =>
                   setUserCredentials({
@@ -398,7 +397,9 @@ export default function RegisterSplit() {
                 onBlur={() => handleBlur('confirmPassword')}
                 placeholder={translations.confirmPasswordPlaceholder}
                 className={errors.confirmPassword ? 'input-error' : ''}
+                hasError={Boolean(errors.confirmPassword)}
                 required
+                autoComplete="new-password"
               />
               {errors.confirmPassword && (
                 <p className="error-text">{errors.confirmPassword}</p>
@@ -417,7 +418,6 @@ export default function RegisterSplit() {
             {translations.loginLink}
           </a>
         </div>
-        <LanguageSwitcher />
       </div>
     </div>
   );

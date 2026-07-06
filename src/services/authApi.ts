@@ -46,19 +46,43 @@ export async function loginWithApi(
   email: string,
   password: string
 ): Promise<LoginResponse> {
-  const response = await fetch(`${API_URL}/api/auth/login`, {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ email: email.trim().toLowerCase(), password }),
-  });
+  const payload = {
+    email: email.trim().toLowerCase(),
+    password,
+  };
 
-  const data = (await response.json()) as LoginResponse;
+  let lastError: Error | null = null;
 
-  if (!response.ok) {
-    throw new Error(data.error || "Erro ao autenticar");
+  for (let attempt = 0; attempt < 3; attempt++) {
+    try {
+      const response = await fetch(`${API_URL}/api/auth/login`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(payload),
+      });
+
+      const data = (await response.json()) as LoginResponse;
+
+      if (!response.ok) {
+        throw new Error(data.error || "Erro ao autenticar");
+      }
+
+      return data;
+    } catch (error) {
+      lastError = error instanceof Error ? error : new Error(String(error));
+      const isNetworkError =
+        lastError.message.includes("Failed to fetch") ||
+        lastError.message.includes("NetworkError");
+
+      if (!isNetworkError || attempt === 2) {
+        throw lastError;
+      }
+
+      await new Promise((resolve) => setTimeout(resolve, 2000 * (attempt + 1)));
+    }
   }
 
-  return data;
+  throw lastError ?? new Error("Erro ao autenticar");
 }
 
 export function storeAuthToken(token: string) {

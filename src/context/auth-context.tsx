@@ -11,7 +11,6 @@ import {
 import {
   onAuthStateChanged,
   signInWithCustomToken,
-  signInWithEmailAndPassword,
   signOut,
   updatePassword,
 } from "firebase/auth";
@@ -56,6 +55,7 @@ interface AuthContextType {
   mustChangePassword: () => boolean;
   completePasswordChange: (newPassword: string) => Promise<{ firebaseSessionReady: boolean }>;
   loading: boolean;
+  firebaseReady: boolean;
   refreshUserData: () => Promise<void>;
 }
 
@@ -77,19 +77,69 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
   const [currentUser, setCurrentUser] = useState<User | null>(null);
   const [currentCompany, setCurrentCompany] = useState<Company | null>(null);
   const [loading, setLoading] = useState(true);
+  const [firebaseReady, setFirebaseReady] = useState(false);
   const lastTokenCheckRef = useRef<number>(0);
   const tokenCheckIntervalRef = useRef<NodeJS.Timeout | null>(null);
+
+  const syncFirebaseReady = (userId?: string | null) => {
+    const ready = Boolean(
+      auth.currentUser && (!userId || auth.currentUser.uid === userId)
+    );
+    setFirebaseReady(ready);
+    return ready;
+  };
 
   const establishFirebaseSession = async (firebaseCustomToken: string) => {
     await signInWithCustomToken(auth, firebaseCustomToken);
   };
 
-  const tryFirebaseEmailSignIn = async (email: string, password: string) => {
+  const ensureFirebaseSessionForUser = async (
+    uid: string,
+    email: string,
+    password: string,
+    displayName: string,
+    firebaseCustomToken?: string | null
+  ): Promise<boolean> => {
     try {
-      await signInWithEmailAndPassword(auth, email, password);
-      return true;
+      if (firebaseCustomToken) {
+        await establishFirebaseSession(firebaseCustomToken);
+      }
+
+      if (syncFirebaseReady(uid)) {
+        return true;
+      }
+
+      if (getAuthToken()) {
+        try {
+          const { firebaseCustomToken: refreshed } = await refreshFirebaseSession();
+          if (refreshed) {
+            await establishFirebaseSession(refreshed);
+          }
+        } catch (error) {
+          console.warn("[Auth] Falha ao renovar custom token:", error);
+        }
+      }
+
+      if (syncFirebaseReady(uid)) {
+        return true;
+      }
+
+      if (auth.currentUser && auth.currentUser.uid !== uid) {
+        await signOut(auth);
+      }
+
+      const signedIn = await ensureFirebaseSignIn({
+        uid,
+        email,
+        password,
+        displayName,
+      });
+
+      syncFirebaseReady(uid);
+      return signedIn;
     } catch (error) {
-      console.warn("[Auth] Firebase email/senha indisponível:", error);
+      console.warn("[Auth] Falha ao estabelecer sessão Firebase:", error);
+      syncFirebaseReady(uid);
       return false;
     }
   };
@@ -114,6 +164,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, async (firebaseUser) => {
       if (firebaseUser) {
+        syncFirebaseReady(firebaseUser.uid);
         try {
           await loadUserData(firebaseUser.uid);
         } catch {
@@ -122,6 +173,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
         return;
       }
 
+      setFirebaseReady(false);
       const savedUser = localStorage.getItem("currentUser");
       const savedToken = getAuthToken();
 
@@ -133,30 +185,63 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
             if (restored) {
               return;
             }
-            await loadUserData(userData.id);
-            return;
           }
         } catch {
           localStorage.removeItem("currentUser");
           clearAuthToken();
         }
-      } else if (savedUser) {
-        try {
-          const userData = JSON.parse(savedUser);
-          if (userData.id) {
-            await loadUserData(userData.id);
-            return;
-          }
-        } catch {
-          localStorage.removeItem("currentUser");
-        }
       }
 
+      if (savedUser && !getAuthToken()) {
+        localStorage.removeItem("currentUser");
+      }
+
+      setCurrentUser(null);
+      setCurrentCompany(null);
       setLoading(false);
     });
 
     return () => unsubscribe();
   }, []);
+
+  useEffect(() => {
+    if (!currentUser?.uid || firebaseReady) {
+      return undefined;
+    }
+
+    let cancelled = false;
+
+    const attemptReconnect = async () => {
+      for (let attempt = 0; attempt < 4; attempt++) {
+        if (cancelled) return;
+
+        if (getAuthToken()) {
+          const restored = await tryRestoreFirebaseSession();
+          if (restored && syncFirebaseReady(currentUser.uid)) {
+            return;
+          }
+        }
+
+        if (auth.currentUser?.uid === currentUser.uid) {
+          syncFirebaseReady(currentUser.uid);
+          return;
+        }
+
+        await new Promise((resolve) => setTimeout(resolve, 1000 * (attempt + 1)));
+      }
+
+      // Evita UI presa em loading se a sessão Firebase não puder ser restaurada
+      if (!cancelled && auth.currentUser?.uid === currentUser.uid) {
+        syncFirebaseReady(currentUser.uid);
+      }
+    };
+
+    void attemptReconnect();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [currentUser?.uid, firebaseReady]);
 
   const loadUserData = async (userId: string) => {
     try {
@@ -178,6 +263,21 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
         const userData = { ...userDoc.data(), uid: userDoc.id } as User;
         console.log("Dados do usuário carregados:", userData);
         setCurrentUser(userData);
+        syncFirebaseReady(userId);
+
+        if (!auth.currentUser) {
+          await new Promise<void>((resolve) => {
+            const timeout = window.setTimeout(resolve, 2500);
+            const unsub = onAuthStateChanged(auth, (firebaseUser) => {
+              if (firebaseUser?.uid === userId) {
+                syncFirebaseReady(userId);
+                window.clearTimeout(timeout);
+                unsub();
+                resolve();
+              }
+            });
+          });
+        }
 
         if (shouldRegisterPush(userData)) {
           registerFcmToken(userId).catch((err) =>
@@ -480,14 +580,15 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
       logAuthError(error, "login - updateLastLogin");
     }
 
-    setCurrentUser(finalUserData);
-
-    await ensureFirebaseSignIn({
-      uid: userDoc.id,
-      email: normalizedEmail,
+    await ensureFirebaseSessionForUser(
+      userDoc.id,
+      normalizedEmail,
       password,
-      displayName: userData.displayName || userData.email,
-    });
+      userData.displayName || userData.email
+    );
+
+    setCurrentUser(finalUserData);
+    syncFirebaseReady(userDoc.id);
 
     if (userData.role === UserRole.COMPANY_USER && userData.companyId) {
       try {
@@ -543,11 +644,13 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
           storeAuthToken(apiResponse.token);
         }
 
-        if (apiResponse.firebaseCustomToken) {
-          await establishFirebaseSession(apiResponse.firebaseCustomToken);
-        } else {
-          await tryFirebaseEmailSignIn(normalizedEmail, password);
-        }
+        await ensureFirebaseSessionForUser(
+          apiResponse.user.uid,
+          normalizedEmail,
+          password,
+          apiResponse.user.displayName || normalizedEmail,
+          apiResponse.firebaseCustomToken
+        );
 
         await loadUserData(apiResponse.user.uid);
         const userDoc = await getDoc(doc(db, "users", apiResponse.user.uid));
@@ -604,6 +707,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
 
     setCurrentUser(null);
     setCurrentCompany(null);
+    setFirebaseReady(false);
     localStorage.removeItem("currentUser");
     clearAuthToken();
     lastTokenCheckRef.current = 0;
@@ -702,6 +806,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
       });
     }
 
+    syncFirebaseReady(currentUser.uid);
     await refreshUserData();
     return { firebaseSessionReady };
   };
@@ -725,6 +830,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
     mustChangePassword,
     completePasswordChange,
     loading,
+    firebaseReady,
     refreshUserData,
   };
 

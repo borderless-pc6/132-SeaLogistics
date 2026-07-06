@@ -1,15 +1,33 @@
-.login-container {
+/* Trava a página — rolagem só na área de conteúdo abaixo da barra de idioma */
+body:has(.login-shell) {
+  overflow: hidden;
+  height: 100%;
+}
+
+.app-container:has(.login-shell) {
+  height: 100dvh;
+  max-height: 100dvh;
+  min-height: 0;
+  overflow: hidden;
+}
+
+.app-container:has(.login-shell) > :last-child {
+  margin-top: 0;
+  height: 100%;
+  min-height: 0;
+}
+
+.login-shell {
   display: flex;
-  justify-content: center;
-  align-items: center;
-  min-height: 100vh;
+  flex-direction: column;
+  height: 100%;
+  min-height: 0;
   background: var(--bg-sidebar);
   position: relative;
   overflow: hidden;
-  padding: 1.5rem;
 }
 
-.login-container::before {
+.login-shell::before {
   content: "";
   position: absolute;
   inset: 0;
@@ -19,25 +37,109 @@
   pointer-events: none;
 }
 
+/* Navbar de idioma — fora da área de scroll, sempre visível */
+.login-lang-corner {
+  flex-shrink: 0;
+  display: flex;
+  justify-content: flex-end;
+  align-items: center;
+  width: 100%;
+  position: relative;
+  z-index: 30;
+  padding: max(1.5rem, env(safe-area-inset-top)) 1.5rem 0.75rem;
+  box-sizing: border-box;
+}
+
+.login-lang-corner .language-switcher {
+  margin: 0;
+  padding: 0;
+  border-top: none;
+  flex-direction: row;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.login-lang-corner .language-switcher p {
+  color: rgba(255, 255, 255, 0.8);
+  margin: 0;
+  font-size: var(--text-xs);
+}
+
+.login-lang-corner .language-buttons {
+  background: rgba(255, 255, 255, 0.12);
+  border: 1px solid rgba(255, 255, 255, 0.18);
+  backdrop-filter: blur(8px);
+}
+
+.login-lang-corner .language-buttons button {
+  color: rgba(255, 255, 255, 0.9);
+}
+
+.login-lang-corner .language-buttons button.active {
+  background: rgba(255, 255, 255, 0.95);
+  color: var(--primary-color);
+}
+
+.login-lang-corner .language-buttons button:hover:not(.active) {
+  color: #fff;
+  background: rgba(255, 255, 255, 0.1);
+}
+
+.login-container {
+  flex: 1;
+  min-height: 0;
+  position: relative;
+  z-index: 1;
+  overflow-x: hidden;
+  overflow-y: auto;
+  padding: 0 1.5rem max(1.5rem, env(safe-area-inset-bottom));
+  box-sizing: border-box;
+  -webkit-overflow-scrolling: touch;
+}
+
+.login-content {
+  display: flex;
+  justify-content: center;
+  align-items: flex-start;
+  width: 100%;
+  min-height: 100%;
+  position: relative;
+}
+
+/* Centraliza quando cabe; expande e rola a janela quando o card é alto */
+.login-content > .login-card,
+.login-content > .split-card {
+  flex-shrink: 0;
+  margin-top: auto;
+  margin-bottom: auto;
+  width: 100%;
+}
+
 .login-card {
   background: var(--white);
   border-radius: var(--radius-xl);
   box-shadow: var(--shadow-xl);
   border: 1px solid var(--border-color);
-  width: 100%;
   max-width: 440px;
-  max-height: 92vh;
-  overflow-y: auto;
   padding: 2.5rem 2rem;
-  position: relative;
-  z-index: 1;
   animation: scaleIn 0.5s var(--ease-spring);
 }
 
 @media (max-width: 480px) {
+  .login-lang-corner {
+    padding: max(1rem, env(safe-area-inset-top)) 1rem 0.5rem;
+  }
+
+  .login-container {
+    padding: 0 1rem max(1rem, env(safe-area-inset-bottom));
+  }
+
+  .login-lang-corner .language-switcher p {
+    display: none;
+  }
+
   .login-card {
     padding: 2rem 1.5rem;
     border-radius: var(--radius-lg);
-    max-height: 95vh;
   }
 }

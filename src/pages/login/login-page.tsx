@@ -5,11 +5,17 @@ import "./login-page.css";
 
 export const LoginPage = () => {
   return (
-    <main className="login-container">
-      <div className="login-card">
-        <LoginForm />
+    <div className="login-shell">
+      <header className="login-lang-corner">
         <LanguageSwitcher />
-      </div>
-    </main>
+      </header>
+      <main className="login-container">
+        <div className="login-content">
+          <div className="login-card">
+            <LoginForm />
+          </div>
+        </div>
+      </main>
+    </div>
   );
 };

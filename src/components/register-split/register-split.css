@@ -11,14 +11,21 @@
   flex-direction: column;
   overflow: hidden;
   position: relative;
-  z-index: 10;
   animation: scaleIn 0.5s var(--ease-spring);
 }
 
 @media (min-width: 768px) {
   .split-card {
     flex-direction: row;
-    min-height: 560px;
+    min-height: min(560px, calc(100dvh - 4rem));
+  }
+
+  .split-branding {
+    border-radius: var(--radius-xl) 0 var(--radius-xl) var(--radius-xl);
+  }
+
+  .split-form-container {
+    border-radius: 0 var(--radius-xl) var(--radius-xl) 0;
   }
 }
 
@@ -32,6 +39,7 @@
   align-items: center;
   position: relative;
   overflow: hidden;
+  border-radius: var(--radius-xl) var(--radius-xl) var(--radius-xl) 0;
 }
 
 .split-branding::before {
@@ -93,7 +101,9 @@
   flex: 1;
   display: flex;
   flex-direction: column;
-  justify-content: center;
+  justify-content: flex-start;
+  background: var(--white);
+  border-radius: 0 0 var(--radius-xl) var(--radius-xl);
 }
 
 .split-title {

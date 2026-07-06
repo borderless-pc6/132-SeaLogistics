@@ -1,19 +1,25 @@
-import type { Shipment } from "../context/shipments-context";
-import {
+const {
   formatContainerSpec,
   formatDatePt,
   formatDateTimePt,
   formatLocationCurrent,
   formatNavioDisplay,
-  formatPosicaoNavioForClient,
   formatRumoLine,
-} from "../utils/shipmentFormatters";
+} = require("./shipmentFormatters");
 
-export function buildJabilEmailSubject(shipment: Shipment): string {
+function escapeHtml(value) {
+  return String(value)
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;");
+}
+
+function buildJabilEmailSubject(shipment) {
   return `Informações do embarque internacional — Booking ${shipment.booking || shipment.numeroBl || ""}`;
 }
 
-function renderShipMapSection(shipment: Shipment): string {
+function renderShipMapSection(shipment) {
   const imageUrl = shipment.shipMapImageUrl?.trim();
   if (imageUrl) {
     return `<div style="margin:24px 0;text-align:center;">
@@ -31,25 +37,25 @@ function renderShipMapSection(shipment: Shipment): string {
   </div>`;
 }
 
-function escapeHtml(value: string): string {
-  return value
-    .replace(/&/g, "&amp;")
-    .replace(/</g, "&lt;")
-    .replace(/>/g, "&gt;")
-    .replace(/"/g, "&quot;");
+function row(label, value) {
+  const display = value?.trim() ? value : "—";
+  if (!label) {
+    return `<tr>
+      <td style="padding:4px 0 4px 16px;color:#666;font-style:italic;border-bottom:1px solid #eee;" colspan="2">${display}</td>
+    </tr>`;
+  }
+  return `<tr>
+    <td style="width:48%;padding:8px 0;color:#666;vertical-align:top;border-bottom:1px solid #eee;">${label}</td>
+    <td style="padding:8px 0;font-weight:600;border-bottom:1px solid #eee;">${display}</td>
+  </tr>`;
 }
 
-/** Template HTML — modelo de comunicação internacional (JABIL) */
-export function renderJabilEmailHtml(shipment: Shipment): string {
+function renderJabilEmailHtml(shipment) {
   const cliente = shipment.cliente || "Cliente";
-  const containers = formatContainerSpec(
-    shipment.quantBox,
-    shipment.containerType
-  );
+  const containers = formatContainerSpec(shipment.quantBox, shipment.containerType);
   const navio = formatNavioDisplay(shipment);
   const localizacao = formatLocationCurrent(shipment);
   const rumoLine = formatRumoLine(shipment);
-  const posicaoCompleta = formatPosicaoNavioForClient(shipment);
 
   return `<!DOCTYPE html>
 <html lang="pt-BR">
@@ -92,12 +98,6 @@ export function renderJabilEmailHtml(shipment: Shipment): string {
 
               ${renderShipMapSection(shipment)}
 
-              ${
-                posicaoCompleta !== localizacao
-                  ? `<p style="margin:16px 0 0;font-size:13px;color:#555;white-space:pre-line;">${escapeHtml(posicaoCompleta)}</p>`
-                  : ""
-              }
-
               <p style="margin:24px 0 0;font-size:13px;color:#666;">Qualquer dúvida, entre em contato com nossa equipe.</p>
               <p style="margin:8px 0 0;">Atenciosamente,<br><strong>Sea Logistics International</strong></p>
             </td>
@@ -115,25 +115,8 @@ export function renderJabilEmailHtml(shipment: Shipment): string {
 </html>`;
 }
 
-function row(label: string, value?: string | null): string {
-  const display = value?.trim() ? value : "—";
-  if (!label) {
-    return `<tr>
-      <td style="padding:4px 0 4px 16px;color:#666;font-style:italic;border-bottom:1px solid #eee;" colspan="2">${display}</td>
-    </tr>`;
-  }
-  return `<tr>
-    <td style="width:48%;padding:8px 0;color:#666;vertical-align:top;border-bottom:1px solid #eee;">${label}</td>
-    <td style="padding:8px 0;font-weight:600;border-bottom:1px solid #eee;">${display}</td>
-  </tr>`;
-}
-
-/** Texto plano para WhatsApp — mesmo conteúdo do modelo do cliente */
-export function renderJabilWhatsAppText(shipment: Shipment): string {
-  const containers = formatContainerSpec(
-    shipment.quantBox,
-    shipment.containerType
-  );
+function renderJabilWhatsAppText(shipment) {
+  const containers = formatContainerSpec(shipment.quantBox, shipment.containerType);
   const navio = formatNavioDisplay(shipment);
   const localizacao = formatLocationCurrent(shipment);
   const rumoLine = formatRumoLine(shipment);
@@ -157,11 +140,26 @@ export function renderJabilWhatsAppText(shipment: Shipment): string {
     `Localização Atual: ${localizacao}`,
   ];
 
-  if (rumoLine) {
-    lines.push(rumoLine);
-  }
-
+  if (rumoLine) lines.push(rumoLine);
   lines.push("", "_Sea Logistics International_");
 
   return lines.join("\n");
 }
+
+function isInternationalShipmentModel(shipment) {
+  const tipo = shipment.tipo?.trim();
+  if (tipo && tipo !== "Marítimo") return false;
+  return Boolean(
+    shipment.navio ||
+      shipment.cargoReady ||
+      shipment.booking ||
+      shipment.emptyToShipper
+  );
+}
+
+module.exports = {
+  buildJabilEmailSubject,
+  renderJabilEmailHtml,
+  renderJabilWhatsAppText,
+  isInternationalShipmentModel,
+};

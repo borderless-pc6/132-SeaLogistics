@@ -9,6 +9,7 @@ import {
   parseSpreadsheetFile,
   type ShipmentImportRow,
 } from "../../services/csvImportService";
+import { downloadFollowUpFieldsTemplate } from "../../services/excelExportService";
 import "./csv-import.css";
 
 export function CsvImport() {
@@ -95,7 +96,16 @@ export function CsvImport() {
           onClick={downloadCSVTemplate}
         >
           <Download size={16} />
-          Baixar Template Excel
+          Template embarque (JABIL)
+        </button>
+
+        <button
+          type="button"
+          className="csv-import-btn secondary"
+          onClick={downloadFollowUpFieldsTemplate}
+        >
+          <Download size={16} />
+          Modelo follow-up cliente
         </button>
 
         <input

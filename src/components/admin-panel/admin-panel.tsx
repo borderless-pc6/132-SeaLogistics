@@ -19,6 +19,7 @@ import { type Company, type User, UserRole, type NotificationPreferences } from 
 import { hashPassword } from "../../utils/passwordUtils";
 import { mergeClientNotificationPreferences } from "../../services/clientContactService";
 import { TemplateEditor } from "../template-editor/template-editor";
+import { PasswordInput } from "../password-input/password-input";
 import "./admin-panel.css";
 
 interface AdminPanelProps {
@@ -1119,8 +1120,7 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({ onClose, initialTab }) =
                     >
                       {translations.password} *
                     </label>
-                    <input
-                      type="password"
+                    <PasswordInput
                       value={newUserData.password}
                       onChange={(e) =>
                         setNewUserData({
@@ -1129,6 +1129,8 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({ onClose, initialTab }) =
                         })
                       }
                       placeholder={translations.passwordPlaceholder}
+                      hasError={Boolean(createUserErrors.password)}
+                      autoComplete="new-password"
                       style={{
                         width: "100%",
                         padding: "0.75rem",
@@ -1161,8 +1163,7 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({ onClose, initialTab }) =
                     >
                       {translations.confirmPassword} *
                     </label>
-                    <input
-                      type="password"
+                    <PasswordInput
                       value={newUserData.confirmPassword}
                       onChange={(e) =>
                         setNewUserData({
@@ -1171,6 +1172,8 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({ onClose, initialTab }) =
                         })
                       }
                       placeholder={translations.confirmPasswordPlaceholder}
+                      hasError={Boolean(createUserErrors.confirmPassword)}
+                      autoComplete="new-password"
                       style={{
                         width: "100%",
                         padding: "0.75rem",

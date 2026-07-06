@@ -90,6 +90,23 @@
   background: #f0f8fb;
 }
 
+.export-jabil-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  padding: 0.5rem 1rem;
+  background: #fff;
+  color: #166534;
+  border: 1px solid #22c55e;
+  border-radius: 8px;
+  cursor: pointer;
+  font-size: 0.9rem;
+}
+
+.export-jabil-btn:hover {
+  background: #f0fdf4;
+}
+
 .edit-btn {
   display: inline-flex;
   align-items: center;
@@ -165,6 +182,13 @@
 
 .detail-footer-link a {
   color: var(--primary, #118ab2);
+}
+
+.shipment-ship-map-preview {
+  max-width: 100%;
+  border-radius: 8px;
+  border: 1px solid #e0e0e0;
+  margin-top: 0.25rem;
 }
 
 @media (max-width: 640px) {

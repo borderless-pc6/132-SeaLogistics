@@ -110,6 +110,16 @@ Sea Logistics`,
   },
 };
 
+const {
+  formatContainerSpec,
+  formatDatePt,
+  formatDateTimePt,
+  formatLocationCurrent,
+  formatLocationWithRoute,
+  formatNavioDisplay,
+  formatRumoLine,
+} = require("./shipmentFormatters");
+
 function getStatusLabel(status) {
   if (!status) return "N/A";
   return STATUS_LABELS[status] || status;
@@ -137,6 +147,20 @@ function buildTemplateVariables(shipment, extra = {}) {
     booking: shipment.booking || "-",
     currentLocation: shipment.currentLocation || "-",
     quantBox: String(shipment.quantBox ?? 0),
+    navio: shipment.navio || shipment.armador || "-",
+    navioDisplay: formatNavioDisplay(shipment),
+    navioCodigo: shipment.navioCodigo || "-",
+    containerSpec: formatContainerSpec(shipment.quantBox, shipment.containerType),
+    cargoReady: formatDatePt(shipment.cargoReady),
+    coleta: formatDatePt(shipment.coleta),
+    emptyToShipper: formatDatePt(shipment.emptyToShipper),
+    readyToLoad: formatDateTimePt(shipment.readyToLoad),
+    loadedOnBoard: formatDatePt(shipment.loadedOnBoard),
+    destinoRumo: shipment.destinoRumo || shipment.pod || "-",
+    etaRumo: formatDatePt(shipment.etaRumo),
+    localizacaoAtual: formatLocationCurrent(shipment),
+    rumoLine: formatRumoLine(shipment) || "",
+    localizacaoCompleta: formatLocationWithRoute(shipment),
   };
 }
 

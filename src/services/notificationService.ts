@@ -4,6 +4,11 @@ import type { Shipment } from "../context/shipments-context";
 import type { NotificationPreferences } from "../types/user";
 import { resolveCompanyClientContact } from "./clientContactService";
 import { renderEmailTemplate } from "./templateService";
+import {
+  buildJabilEmailSubject,
+  renderJabilEmailHtml,
+} from "./jabilEmailTemplate";
+import { isInternationalShipmentModel } from "../utils/shipmentFormatters";
 
 export type { CompanyClientContact } from "./clientContactService";
 export { resolveCompanyClientContact } from "./clientContactService";
@@ -18,6 +23,14 @@ export const sendShipmentCreatedEmail = async (
   shipment: Shipment,
   clientEmail: string
 ): Promise<boolean> => {
+  if (isInternationalShipmentModel(shipment)) {
+    return sendEmail({
+      to: clientEmail,
+      subject: buildJabilEmailSubject(shipment),
+      html: renderJabilEmailHtml(shipment),
+    });
+  }
+
   const { subject, html } = await renderEmailTemplate(
     "new_shipment_email",
     shipment
@@ -35,6 +48,14 @@ export const sendStatusUpdateEmail = async (
   clientEmail: string,
   oldStatus: string
 ): Promise<boolean> => {
+  if (isInternationalShipmentModel(shipment)) {
+    return sendEmail({
+      to: clientEmail,
+      subject: buildJabilEmailSubject(shipment),
+      html: renderJabilEmailHtml(shipment),
+    });
+  }
+
   const { subject, html } = await renderEmailTemplate(
     "status_update_email",
     shipment,

@@ -6,7 +6,10 @@ import {
   formatContainerSpec,
   formatDatePt,
   formatDateTimePt,
+  formatLocationCurrent,
   formatLocationWithRoute,
+  formatNavioDisplay,
+  formatRumoLine,
 } from "../utils/shipmentFormatters";
 import type {
   NotificationTemplate,
@@ -120,41 +123,48 @@ _Sea Logistics International_`,
   jabil_shipment_email: {
     id: "jabil_shipment_email",
     name: "Embarque Internacional (JABIL)",
-    subject: "Embarque internacional — Booking {{booking}}",
+    subject: "Informações do embarque internacional — Booking {{booking}}",
     body: `<p>Prezado(a) Cliente <strong>{{cliente}}</strong>,</p>
-<p>Segue as informações referentes ao seu embarque internacional.</p>
-<h3>📦 Detalhes do Embarque</h3>
+<p>Segue as informações referente a seu embarque internacional.</p>
+<h3>📦 Detalhes do Embarque:</h3>
 <ul>
   <li><strong>Booking:</strong> {{booking}}</li>
-  <li><strong>Navio:</strong> {{navio}}</li>
+  <li><strong>Navio:</strong> {{navioDisplay}}</li>
   <li><strong>Contêineres:</strong> {{containerSpec}}</li>
-  <li><strong>Carga Pronta:</strong> {{cargoReady}}</li>
+  <li><strong>Carga Pronta (Cargo Ready):</strong> {{cargoReady}}</li>
   <li><strong>Coleta:</strong> {{coleta}}</li>
-  <li><strong>Empty to Shipper:</strong> {{emptyToShipper}}</li>
-  <li><strong>Ready to Load:</strong> {{readyToLoad}}</li>
-  <li><strong>Loaded on Board:</strong> {{loadedOnBoard}}</li>
-  <li><strong>ETD:</strong> {{etdOrigem}}</li>
-  <li><strong>ETA:</strong> {{etaDestino}}</li>
-  <li><strong>Localização:</strong> {{localizacaoCompleta}}</li>
-  <li><strong>Status:</strong> {{status}}</li>
+  <li><strong>Contêiner Vazio Disponível para o Exportador (Empty to Shipper):</strong> {{emptyToShipper}}</li>
+  <li><strong>Pronto para Carregamento (Ready to be loaded):</strong> {{readyToLoad}}</li>
+  <li><strong>Carregado a Bordo (Loaded on Board):</strong> {{loadedOnBoard}}</li>
+  <li><strong>Partida Estimada (ETD – Estimated Time of Departure):</strong> {{etdOrigem}}</li>
+  <li><strong>Chegada Estimada (ETA – Estimated Time of Arrival):</strong> {{etaDestino}}</li>
+  <li><strong>Localização Atual:</strong> {{localizacaoAtual}}</li>
+  <li>{{rumoLine}}</li>
 </ul>
 <p>Atenciosamente,<br>Sea Logistics International</p>`,
   },
   jabil_shipment_whatsapp: {
     id: "jabil_shipment_whatsapp",
-    name: "Embarque Internacional WhatsApp (JABIL — legado)",
-    body: `🚢 *Embarque Internacional*
+    name: "Embarque Internacional WhatsApp (JABIL)",
+    body: `Prezado(a) Cliente *{{cliente}}*,
 
-Prezado(a) *{{cliente}}*,
+Segue as informações referente a seu embarque internacional.
 
-• Booking: {{booking}}
-• Navio: {{navio}}
-• Contêineres: {{containerSpec}}
-• ETD: {{etdOrigem}} | ETA: {{etaDestino}}
-• Local: {{localizacaoCompleta}}
-• Status: {{status}}
+📦 *Detalhes do Embarque:*
+Booking: {{booking}}
+Navio: {{navioDisplay}}
+Contêineres: {{containerSpec}}
+Carga Pronta (Cargo Ready): {{cargoReady}}
+Coleta: {{coleta}}
+Contêiner Vazio Disponível para o Exportador (Empty to Shipper): {{emptyToShipper}}
+Pronto para Carregamento (Ready to be loaded): {{readyToLoad}}
+Carregado a Bordo (Loaded on Board): {{loadedOnBoard}}
+Partida Estimada (ETD – Estimated Time of Departure): {{etdOrigem}}
+Chegada Estimada (ETA – Estimated Time of Arrival): {{etaDestino}}
+Localização Atual: {{localizacaoAtual}}
+{{rumoLine}}
 
-_Sea Logistics_`,
+_Sea Logistics International_`,
   },
   new_shipment_push: {
     id: "new_shipment_push",
@@ -193,13 +203,19 @@ Sea Logistics`,
   jabil_shipment_push: {
     id: "jabil_shipment_push",
     name: "Embarque Internacional Push (JABIL)",
-    body: `🚢 Embarque internacional — {{cliente}}
+    body: `Prezado(a) Cliente {{cliente}},
 
-Booking: {{booking}} | Navio: {{navio}}
+Segue as informações referente a seu embarque internacional.
+
+📦 Detalhes do Embarque:
+Booking: {{booking}}
+Navio: {{navioDisplay}}
+Contêineres: {{containerSpec}}
 ETD: {{etdOrigem}} | ETA: {{etaDestino}}
-Status: {{status}}
+Localização Atual: {{localizacaoAtual}}
+{{rumoLine}}
 
-Sea Logistics`,
+Sea Logistics International`,
   },
 };
 
@@ -231,6 +247,8 @@ export function buildTemplateVariables(
     currentLocation: shipment.currentLocation || "-",
     quantBox: String(shipment.quantBox ?? 0),
     navio: shipment.navio || shipment.armador || "-",
+    navioDisplay: formatNavioDisplay(shipment),
+    navioCodigo: shipment.navioCodigo || "-",
     containerSpec: formatContainerSpec(
       shipment.quantBox,
       shipment.containerType
@@ -241,6 +259,9 @@ export function buildTemplateVariables(
     readyToLoad: formatDateTimePt(shipment.readyToLoad),
     loadedOnBoard: formatDatePt(shipment.loadedOnBoard),
     destinoRumo: shipment.destinoRumo || shipment.pod || "-",
+    etaRumo: formatDatePt(shipment.etaRumo),
+    localizacaoAtual: formatLocationCurrent(shipment),
+    rumoLine: formatRumoLine(shipment) || "",
     localizacaoCompleta: formatLocationWithRoute(shipment),
   };
 }

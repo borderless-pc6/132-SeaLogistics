@@ -8,6 +8,7 @@ import { useAuth } from "../../context/auth-context";
 import { useToast } from "../../context/toast-context";
 import { passwordSchema } from "../../schemas/passwordSchema";
 import { PasswordStrengthIndicator } from "../../components/password-strength-indicator";
+import { PasswordInput } from "../../components/password-input/password-input";
 import "./change-password-page.css";
 
 const changePasswordSchema = z
@@ -79,14 +80,14 @@ export const ChangePasswordPage = () => {
         <form onSubmit={handleSubmit} className="change-password-form" noValidate>
           <div className="form-group">
             <label htmlFor="newPassword">Nova senha</label>
-            <input
+            <PasswordInput
               id="newPassword"
-              type="password"
               value={newPassword}
               onChange={(e) => setNewPassword(e.target.value)}
               placeholder="Digite a nova senha"
               disabled={isSubmitting}
               autoComplete="new-password"
+              hasError={Boolean(errors.newPassword)}
             />
             {errors.newPassword && <p className="error-text">{errors.newPassword}</p>}
             <PasswordStrengthIndicator password={newPassword} />
@@ -94,14 +95,14 @@ export const ChangePasswordPage = () => {
 
           <div className="form-group">
             <label htmlFor="confirmPassword">Confirmar nova senha</label>
-            <input
+            <PasswordInput
               id="confirmPassword"
-              type="password"
               value={confirmPassword}
               onChange={(e) => setConfirmPassword(e.target.value)}
               placeholder="Repita a nova senha"
               disabled={isSubmitting}
               autoComplete="new-password"
+              hasError={Boolean(errors.confirmPassword)}
             />
             {errors.confirmPassword && (
               <p className="error-text">{errors.confirmPassword}</p>

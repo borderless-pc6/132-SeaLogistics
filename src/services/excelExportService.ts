@@ -2,6 +2,12 @@ import { saveAs } from "file-saver";
 import * as XLSX from "xlsx";
 import type { Shipment } from "../context/shipments-context";
 import { getStatusLabel } from "../constants/statusOptions";
+import {
+  formatContainerSpec,
+  formatDateShortPt,
+  formatPosicaoNavioForClient,
+  formatStatusLabelUpper,
+} from "../utils/shipmentFormatters";
 
 function formatDate(dateString?: string): string {
   if (!dateString) return "";
@@ -106,6 +112,133 @@ export function exportShipmentToExcel(shipment: Shipment): void {
     : `follow-up-${shipment.cliente}-${new Date().toISOString().split("T")[0]}.xlsx`;
 
   downloadWorkbook(workbook, fileName);
+}
+
+/**
+ * Planilha "STATUS OPERAÇÃO" — modelo do PDF de referência JABIL
+ * (enviada ao cliente via WhatsApp com foto do navio).
+ */
+export function exportJabilStatusSpreadsheet(shipment: Shipment): void {
+  const workbook = XLSX.utils.book_new();
+  const reportDate = new Date()
+    .toLocaleDateString("pt-BR", {
+      day: "2-digit",
+      month: "long",
+      year: "numeric",
+    })
+    .toUpperCase();
+
+  const cliente = (shipment.cliente || "CLIENTE").toUpperCase();
+  const posicaoResumo = shipment.currentLocation?.trim() || "—";
+  const posicaoDetalhe = formatPosicaoNavioForClient(shipment);
+
+  const headers = [
+    "CLIENTE",
+    "SHIPPER",
+    "OPERADOR",
+    "POL",
+    "POD",
+    "ETD ORIGEM",
+    "ETA DESTINO",
+    "QUANT BOX",
+    "TIPO CNTR",
+    "STATUS",
+    "CE",
+    "INVOICE",
+    "N° BL",
+    "ARMADOR",
+    "BOOKING",
+    "POSIÇÃO ATUAL DO NV",
+  ];
+
+  const dataRow = [
+    shipment.cliente || "",
+    shipment.shipper || "",
+    shipment.operador || "",
+    shipment.pol || "",
+    shipment.pod || "",
+    formatDateShortPt(shipment.etdOrigem),
+    formatDateShortPt(shipment.etaDestino),
+    shipment.quantBox ?? "",
+    shipment.containerType || "40HC",
+    formatStatusLabelUpper(shipment.status),
+    shipment.ce || "A INFORMAR",
+    shipment.invoice || "A INFORMAR",
+    shipment.numeroBl || "",
+    shipment.armador || "",
+    shipment.booking || "",
+    posicaoResumo,
+  ];
+
+  const sheetData = [
+    [`STATUS OPERAÇÃO ${cliente}`],
+    [`Data: ${reportDate}`],
+    [],
+    headers,
+    dataRow,
+    [],
+    ["Detalhamento da posição do navio:"],
+    [posicaoDetalhe],
+  ];
+
+  if (shipment.shipMapImageUrl?.trim()) {
+    sheetData.push([], ["URL mapa/foto do navio:"], [shipment.shipMapImageUrl]);
+  }
+
+  const worksheet = XLSX.utils.aoa_to_sheet(sheetData);
+  worksheet["!cols"] = headers.map(() => ({ wch: 16 }));
+  worksheet["!merges"] = [
+    { s: { r: 0, c: 0 }, e: { r: 0, c: headers.length - 1 } },
+    { s: { r: 1, c: 0 }, e: { r: 1, c: headers.length - 1 } },
+  ];
+
+  XLSX.utils.book_append_sheet(workbook, worksheet, "Status Operação");
+
+  const fileName = `status-operacao-${(shipment.cliente || "cliente").toLowerCase()}-${shipment.booking || shipment.numeroBl || "embarque"}.xlsx`;
+  downloadWorkbook(workbook, fileName);
+}
+
+/** Modelo de campos para follow-up (referência: INFORMAÇÕES PARA FOLLOW UP DOS CLIENTES.xlsx) */
+export function downloadFollowUpFieldsTemplate(): void {
+  const workbook = XLSX.utils.book_new();
+  const sheetData = [
+    ["INFORMAÇÕES QUE ENVIAMOS AO CLIENTE PRE - POS EMBARQUE"],
+    [],
+    ["IMPORTAÇÃO", "AÉREO", "RODOVIÁRIO"],
+    ["EMBARQUES FCL - LCL", "ETD", "COLETA"],
+    ["DATA CARGA PRONTA", "ETA", "ORIGEM"],
+    ["PREVISÃO DA COLETA", "TIPO DE CARGA", "DESTINO"],
+    ["COLETA REALIZADA", "AEROPORTO ORIGEM", "CTE"],
+    ["FOTO DA CARGA COLETADA", "AEROPORTO DESTINO", "LOCALIZAÇÃO ATUAL"],
+    ["BL", "MAWB", ""],
+    ["CNTR", "HAWB", ""],
+    ["NAVIO/VIAGEM", "Número do Voo", ""],
+    ["Empty to shipper", "Volume Total", ""],
+    ["Ready to be loaded", "Peso Bruto (G.W)", ""],
+    ["ETD", "", ""],
+    ["ETA", "", ""],
+    ["Localização atual do navio", "", ""],
+    [],
+    ["Mapeamento no Sea Logistics (marítimo):"],
+    ["Campo planilha", "Campo sistema"],
+    ["DATA CARGA PRONTA", "cargoReady"],
+    ["PREVISÃO DA COLETA / COLETA", "coleta"],
+    ["BL", "numeroBl"],
+    ["CNTR", "quantBox + containerType"],
+    ["NAVIO/VIAGEM", "navio + navioCodigo"],
+    ["Empty to shipper", "emptyToShipper"],
+    ["Ready to be loaded", "readyToLoad"],
+    ["ETD", "etdOrigem"],
+    ["ETA", "etaDestino"],
+    ["Localização atual do navio", "currentLocation + destinoRumo + etaRumo"],
+    ["CE", "ce"],
+    ["BOOKING", "booking"],
+  ];
+
+  const worksheet = XLSX.utils.aoa_to_sheet(sheetData);
+  worksheet["!cols"] = [{ wch: 34 }, { wch: 28 }, { wch: 22 }];
+  XLSX.utils.book_append_sheet(workbook, worksheet, "Programação de Navios");
+  downloadWorkbook(workbook, "modelo-follow-up-clientes.xlsx");
 }
 
 export function exportShipmentsReport(shipments: Shipment[]): void {

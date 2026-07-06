@@ -43,8 +43,8 @@ interface RecentActivity {
 }
 
 export const Dashboard = () => {
-  const { currentUser, isAdmin, canCreateShipment, canManageEmployees } = useAuth();
-  const { shipments, loading } = useShipments();
+  const { currentUser, isAdmin, canCreateShipment, canManageEmployees, loading: authLoading } = useAuth();
+  const { shipments, loading: shipmentsLoading } = useShipments();
   const { translations } = useLanguage();
   const navigate = useNavigate();
   const [stats, setStats] = useState<DashboardStats>({
@@ -56,12 +56,14 @@ export const Dashboard = () => {
   });
   const [recentActivity, setRecentActivity] = useState<RecentActivity[]>([]);
 
+  const isPageLoading = authLoading || shipmentsLoading;
+
   // Redirecionar admins para a página de envios
   useEffect(() => {
-    if (!loading && isAdmin()) {
+    if (!isPageLoading && isAdmin()) {
       navigate("/envios");
     }
-  }, [isAdmin, loading, navigate]);
+  }, [isAdmin, isPageLoading, navigate]);
 
   const calculateStats = useCallback((shipmentsToStat: Shipment[]) => {
     const now = new Date();
@@ -163,10 +165,8 @@ export const Dashboard = () => {
   };
 
   useEffect(() => {
-    if (shipments.length > 0) {
-      calculateStats(shipments);
-      generateRecentActivity(shipments);
-    }
+    calculateStats(shipments);
+    generateRecentActivity(shipments);
   }, [shipments, calculateStats, generateRecentActivity]);
 
   const formatDate = (dateString: string) => {
@@ -201,12 +201,12 @@ export const Dashboard = () => {
   };
 
   // Se for admin ou ainda carregando, não mostrar o dashboard
-  if (loading || isAdmin()) {
+  if (isPageLoading || isAdmin()) {
     return (
       <main className="dashboard-container">
         <Navbar />
         <div className="dashboard-content fade-in">
-          {loading ? (
+          {isPageLoading ? (
             <>
               <div className="dashboard-header">
                 <h1>{translations.dashboard}</h1>

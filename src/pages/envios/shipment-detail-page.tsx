@@ -1,6 +1,6 @@
 "use client";
 
-import { ArrowLeft, Edit, Mail, MapPin, Package, Ship } from "lucide-react";
+import { ArrowLeft, Edit, FileSpreadsheet, Mail, MapPin, Package, Ship } from "lucide-react";
 import { useEffect, useState } from "react";
 import { Link, useNavigate, useParams } from "react-router-dom";
 import { EmailPreviewModal } from "../../components/email-preview-modal/email-preview-modal";
@@ -14,8 +14,10 @@ import { useLanguage } from "../../context/language-context";
 import { type Shipment, useShipments } from "../../context/shipments-context";
 import {
   formatContainerSpec,
-  formatLocationWithRoute,
+  formatNavioDisplay,
+  formatPosicaoNavioForClient,
 } from "../../utils/shipmentFormatters";
+import { exportJabilStatusSpreadsheet } from "../../services/excelExportService";
 import "./shipment-detail-page.css";
 
 export function ShipmentDetailPage() {
@@ -119,7 +121,14 @@ export function ShipmentDetailPage() {
                 className="preview-email-btn"
                 onClick={() => setShowEmailPreview(true)}
               >
-                <Mail size={16} /> Preview e-mail JABIL
+                <Mail size={16} /> Preview comunicação
+              </button>
+              <button
+                type="button"
+                className="export-jabil-btn"
+                onClick={() => exportJabilStatusSpreadsheet(shipment)}
+              >
+                <FileSpreadsheet size={16} /> Planilha cliente
               </button>
             </div>
           )}
@@ -141,6 +150,8 @@ export function ShipmentDetailPage() {
               <dd>{shipment.armador || "—"}</dd>
               <dt>Booking</dt>
               <dd>{shipment.booking || "—"}</dd>
+              <dt>CE</dt>
+              <dd>{shipment.ce || "—"}</dd>
               <dt>Invoice</dt>
               <dd>{shipment.invoice || "—"}</dd>
               <dt>Containers</dt>
@@ -150,7 +161,7 @@ export function ShipmentDetailPage() {
               {shipment.navio && (
                 <>
                   <dt>Navio</dt>
-                  <dd>{shipment.navio}</dd>
+                  <dd>{formatNavioDisplay(shipment)}</dd>
                 </>
               )}
               {shipment.imo && (
@@ -180,7 +191,9 @@ export function ShipmentDetailPage() {
               <dt>ETA reportado</dt>
               <dd>{formatDate(shipment.reportedEta)}</dd>
               <dt>Localização atual</dt>
-              <dd>{formatLocationWithRoute(shipment)}</dd>
+              <dd style={{ whiteSpace: "pre-line" }}>
+                {formatPosicaoNavioForClient(shipment)}
+              </dd>
             </dl>
           </section>
 
@@ -199,6 +212,18 @@ export function ShipmentDetailPage() {
               <dd>{formatDate(shipment.readyToLoad)}</dd>
               <dt>Loaded on Board</dt>
               <dd>{formatDate(shipment.loadedOnBoard)}</dd>
+              {shipment.shipMapImageUrl && (
+                <>
+                  <dt>Mapa do navio</dt>
+                  <dd>
+                    <img
+                      src={shipment.shipMapImageUrl}
+                      alt="Posição do navio"
+                      className="shipment-ship-map-preview"
+                    />
+                  </dd>
+                </>
+              )}
             </dl>
           </section>
 

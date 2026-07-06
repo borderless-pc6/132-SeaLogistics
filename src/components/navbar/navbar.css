@@ -170,17 +170,17 @@
   width: 38px;
   height: 38px;
   border-radius: var(--radius-sm);
-  background: rgba(255, 255, 255, 0.08);
-  border: 1px solid rgba(255, 255, 255, 0.12);
-  color: rgba(255, 255, 255, 0.85);
+  background: #fecaca;
+  border: 1px solid #fca5a5;
+  color: #b91c1c;
   cursor: pointer;
   transition: all var(--transition-fast);
 }
 
 .app-header__logout:hover {
-  background: rgba(220, 38, 38, 0.25);
-  border-color: rgba(220, 38, 38, 0.4);
-  color: #fca5a5;
+  background: #fca5a5;
+  border-color: #f87171;
+  color: #991b1b;
 }
 
 /* Mobile menu */
@@ -267,18 +267,24 @@
     padding: 14px 16px;
     margin-top: var(--space-sm);
     border-top: 1px solid rgba(255, 255, 255, 0.08);
-    background: transparent;
+    background: #fecaca;
     border-left: none;
     border-right: none;
     border-bottom: none;
-    border-radius: 0;
-    color: #fca5a5;
+    border-radius: var(--radius-sm);
+    color: #b91c1c;
     font-size: var(--text-base);
     font-weight: 600;
     font-family: inherit;
     cursor: pointer;
     width: 100%;
     text-align: left;
+    transition: background var(--transition-fast), color var(--transition-fast);
+  }
+
+  .app-header__mobile-logout:hover {
+    background: #fca5a5;
+    color: #991b1b;
   }
 }
 
