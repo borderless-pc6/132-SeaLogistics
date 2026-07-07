@@ -10,9 +10,7 @@ import ExcelIntegration from "../../components/excel-integration/excel-integrati
 import { TrackingSimulator } from "../../components/tracking-simulator/tracking-simulator";
 import Navbar from "../../components/navbar/navbar";
 import { NavbarContext } from "../../components/navbar/navbar-context";
-import ShippingTable, {
-  type Shipment,
-} from "../../components/shipping-table/shipping-table";
+import ShippingTable from "../../components/shipping-table/shipping-table";
 import { useShipments } from "../../context/shipments-context";
 import "./envios-page.css";
 
@@ -24,34 +22,21 @@ export const EnviosPage = () => {
     status: "",
     filter: "",
   });
-  const [shipments, setShipments] = useState<Shipment[]>([]);
   const [showExcelIntegration, setShowExcelIntegration] = useState(false);
   const [showCsvImport, setShowCsvImport] = useState(false);
   const [showTracking, setShowTracking] = useState(false);
 
-  const { shipments: dbShipments } = useShipments();
+  const { shipments: dbShipments, refresh } = useShipments();
 
   useEffect(() => {
-    // Processar parâmetros da URL para aplicar filtros
     const status = searchParams.get("status") || "";
     const filter = searchParams.get("filter") || "";
 
     setActiveFilters({ status, filter });
   }, [searchParams]);
 
-  const handleShipmentUpdate = (updatedShipment: Shipment) => {
-    console.log("Envio atualizado na página de envios:", updatedShipment);
-    // Atualizar o shipment na lista local
-    setShipments((prev) =>
-      prev.map((shipment) =>
-        shipment.id === updatedShipment.id ? updatedShipment : shipment
-      )
-    );
-  };
-
-  const handleShipmentsUpdate = (updatedShipments: any[]) => {
-    console.log("Lista de envios atualizada via Excel:", updatedShipments);
-    setShipments(updatedShipments);
+  const handleShipmentsUpdate = () => {
+    refresh();
   };
 
   return (
@@ -123,7 +108,6 @@ export const EnviosPage = () => {
           </div>
         )}
 
-        {/* Mostrar filtros ativos se houver */}
         {(activeFilters.status || activeFilters.filter) && (
           <div className="active-filters">
             <h3>Filtros Ativos:</h3>
@@ -147,10 +131,7 @@ export const EnviosPage = () => {
           </div>
         )}
 
-        <ShippingTable
-          onShipmentUpdate={handleShipmentUpdate}
-          initialFilters={activeFilters}
-        />
+        <ShippingTable initialFilters={activeFilters} />
       </div>
       <ChatAssistant />
     </main>

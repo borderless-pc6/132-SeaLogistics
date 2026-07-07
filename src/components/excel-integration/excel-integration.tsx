@@ -16,7 +16,7 @@ import "./excel-integration.css";
 
 interface ExcelIntegrationProps {
   shipments: any[];
-  onShipmentsUpdate: (shipments: any[]) => void;
+  onShipmentsUpdate: () => void;
 }
 
 const ExcelIntegration: React.FC<ExcelIntegrationProps> = ({
@@ -83,8 +83,8 @@ const ExcelIntegration: React.FC<ExcelIntegrationProps> = ({
     localStorage.removeItem("excel_config");
   };
 
-  const handleDataUpdate = (data: any[]) => {
-    onShipmentsUpdate(data);
+  const handleDataUpdate = () => {
+    onShipmentsUpdate();
   };
 
   return (

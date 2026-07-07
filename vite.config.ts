@@ -55,7 +55,23 @@ export default defineConfig(({ mode }) => {
         '@': path.resolve(__dirname, './src')
       }
     },
-    // Expor todas as variáveis de ambiente que começam com VITE_
+    build: {
+      rollupOptions: {
+        output: {
+          manualChunks: {
+            firebase: [
+              'firebase/app',
+              'firebase/auth',
+              'firebase/firestore',
+              'firebase/storage',
+            ],
+            charts: ['recharts'],
+            pdf: ['jspdf', 'jspdf-autotable'],
+            excel: ['xlsx'],
+          },
+        },
+      },
+    },
     define: {
       'process.env': env
     }

@@ -10,12 +10,12 @@ import './excel-integration-page.css';
 
 const ExcelIntegrationPage: React.FC = () => {
     const { translations } = useLanguage();
-    const { shipments, setShipments } = useShipments();
+    const { shipments, refresh } = useShipments();
     const navigate = useNavigate();
     const [useTestMode, setUseTestMode] = useState(true);
 
-    const handleShipmentsUpdate = (updatedShipments: any[]) => {
-        setShipments(updatedShipments);
+    const handleShipmentsUpdate = () => {
+        refresh();
     };
 
     return (

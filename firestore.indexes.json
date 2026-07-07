@@ -5,16 +5,6 @@
             "queryScope": "COLLECTION",
             "fields": [
                 {
-                    "fieldPath": "createdAt",
-                    "order": "DESCENDING"
-                }
-            ]
-        },
-        {
-            "collectionGroup": "shipments",
-            "queryScope": "COLLECTION",
-            "fields": [
-                {
                     "fieldPath": "companyId",
                     "order": "ASCENDING"
                 },
@@ -25,6 +15,7 @@
             ]
         },
         {
+            "collectionGroup": "statusHistory",
             "queryScope": "COLLECTION",
             "fields": [
                 {
@@ -34,6 +25,74 @@
                 {
                     "fieldPath": "changedAt",
                     "order": "DESCENDING"
+                }
+            ]
+        },
+        {
+            "collectionGroup": "documents",
+            "queryScope": "COLLECTION",
+            "fields": [
+                {
+                    "fieldPath": "shipmentId",
+                    "order": "ASCENDING"
+                },
+                {
+                    "fieldPath": "isActive",
+                    "order": "ASCENDING"
+                },
+                {
+                    "fieldPath": "uploadedAt",
+                    "order": "DESCENDING"
+                }
+            ]
+        },
+        {
+            "collectionGroup": "documents",
+            "queryScope": "COLLECTION",
+            "fields": [
+                {
+                    "fieldPath": "shipmentId",
+                    "order": "ASCENDING"
+                },
+                {
+                    "fieldPath": "documentType",
+                    "order": "ASCENDING"
+                },
+                {
+                    "fieldPath": "isActive",
+                    "order": "ASCENDING"
+                },
+                {
+                    "fieldPath": "uploadedAt",
+                    "order": "DESCENDING"
+                }
+            ]
+        },
+        {
+            "collectionGroup": "users",
+            "queryScope": "COLLECTION",
+            "fields": [
+                {
+                    "fieldPath": "role",
+                    "order": "ASCENDING"
+                },
+                {
+                    "fieldPath": "isActive",
+                    "order": "ASCENDING"
+                }
+            ]
+        },
+        {
+            "collectionGroup": "users",
+            "queryScope": "COLLECTION",
+            "fields": [
+                {
+                    "fieldPath": "companyId",
+                    "order": "ASCENDING"
+                },
+                {
+                    "fieldPath": "role",
+                    "order": "ASCENDING"
                 }
             ]
         }

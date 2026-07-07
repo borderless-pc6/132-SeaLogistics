@@ -2,13 +2,12 @@
 
 import type React from "react";
 
-import { collection, getDocs, query, where } from "firebase/firestore";
 import { FileText, MapPin, Package, Save, Ship, User, X } from "lucide-react";
 import { useEffect, useState } from "react";
 import { createPortal } from "react-dom";
 import { useLanguage } from "../../context/language-context";
+import { useReferenceData } from "../../context/reference-data-context";
 import type { Shipment } from "../../context/shipments-context";
-import { db } from "../../lib/firebaseConfig";
 import { Cliente } from "../../types/customer";
 import { ShipmentTimeline } from "../shipment-timeline/shipment-timeline";
 import { CONTAINER_TYPES } from "../../utils/shipmentFormatters";
@@ -78,6 +77,7 @@ const EditShipmentModal = ({
   canEdit,
 }: EditShipmentModalProps) => {
   const { translations } = useLanguage();
+  const { getCompanyUsers, loading: referenceLoading } = useReferenceData();
   const [formData, setFormData] = useState<FormData>({
     cliente: "",
     operador: "",
@@ -121,38 +121,16 @@ const EditShipmentModal = ({
   const [selectedClienteId, setSelectedClienteId] = useState<string>("");
 
   useEffect(() => {
-    const fetchClientes = async () => {
-      setLoadingClientes(true);
-      try {
-        const usersQuery = query(
-          collection(db, "users"),
-          where("role", "!=", "admin")
-        );
-
-        const snapshot = await getDocs(usersQuery);
-
-        const clientesData: Cliente[] = snapshot.docs.map((doc) => {
-          const data = doc.data();
-          return {
-            id: doc.id,
-            nome: data.displayName || data.name || translations.user,
-            empresa: data.companyName || "-",
-            email: data.email || "-",
-            companyId: data.companyId || undefined,
-          };
-        });
-
-        setClientes(clientesData);
-      } catch (error) {
-        console.error("Erro ao buscar clientes:", error);
-        setClientes([]);
-      } finally {
-        setLoadingClientes(false);
-      }
-    };
-
-    fetchClientes();
-  }, [translations]);
+    setLoadingClientes(referenceLoading);
+    const clientesData: Cliente[] = getCompanyUsers().map((user) => ({
+      id: user.uid,
+      nome: user.displayName || translations.user,
+      empresa: user.companyName || "-",
+      email: user.email || "-",
+      companyId: user.companyId,
+    }));
+    setClientes(clientesData);
+  }, [getCompanyUsers, referenceLoading, translations.user]);
 
   const armadores = [
     "MSC",

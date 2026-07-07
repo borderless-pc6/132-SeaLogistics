@@ -8,7 +8,7 @@ import "./excel-sync.css";
 
 interface ExcelSyncProps {
   config: ExcelConfig | null;
-  onDataUpdate: (data: any[]) => void;
+  onDataUpdate: () => void;
   currentShipments?: any[];
 }
 
@@ -117,7 +117,7 @@ const ExcelSync: React.FC<ExcelSyncProps> = ({
 
       setExcelData(excelDataResult);
 
-      onDataUpdate(excelDataResult);
+      onDataUpdate();
 
       setLastSync(new Date());
       setSyncStatus(
@@ -194,12 +194,12 @@ const ExcelSync: React.FC<ExcelSyncProps> = ({
         }`
       );
       setExcelData([]);
-      onDataUpdate([]);
+      onDataUpdate();
     } catch (error) {
       console.error("Erro ao salvar dados no banco:", error);
       setError("Erro ao salvar dados no banco de dados");
       setExcelData([]);
-      onDataUpdate([]);
+      onDataUpdate();
     } finally {
       setIsSavingToDb(false);
     }
@@ -319,7 +319,7 @@ const ExcelSync: React.FC<ExcelSyncProps> = ({
       if (response.ok) {
         const result = await response.json();
         if (result.success && result.data) {
-          onDataUpdate(result.data);
+          onDataUpdate();
           setLastSync(new Date());
           setSyncStatus(
             `Dados atualizados do servidor - ${result.data.length} registros`

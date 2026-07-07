@@ -1,10 +1,8 @@
 "use client";
 
 import {
-  collection,
   deleteDoc,
   doc,
-  getDocs,
   setDoc,
   updateDoc,
 } from "firebase/firestore";
@@ -13,7 +11,9 @@ import type React from "react";
 import { useEffect, useState } from "react";
 import { useAuth } from "../../context/auth-context";
 import { useLanguage } from "../../context/language-context";
+import { useReferenceData } from "../../context/reference-data-context";
 import type { Shipment } from "../../context/shipments-context";
+import { useShipments } from "../../context/shipments-context";
 import { db } from "../../lib/firebaseConfig";
 import { type Company, type User, UserRole, type NotificationPreferences } from "../../types/user";
 import { hashPassword } from "../../utils/passwordUtils";
@@ -30,6 +30,13 @@ interface AdminPanelProps {
 export const AdminPanel: React.FC<AdminPanelProps> = ({ onClose, initialTab }) => {
   const { isAdmin } = useAuth();
   const { translations } = useLanguage();
+  const {
+    users: referenceUsers,
+    companies: referenceCompanies,
+    loading: referenceLoading,
+    refresh: refreshReferenceData,
+  } = useReferenceData();
+  const { shipments: contextShipments } = useShipments();
   const [users, setUsers] = useState<User[]>([]);
   const [companies, setCompanies] = useState<Company[]>([]);
   const [shipments, setShipments] = useState<Shipment[]>([]);
@@ -73,57 +80,27 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({ onClose, initialTab }) =
   useEffect(() => {
     if (!isAdmin()) return;
 
-    // Definir aba inicial se fornecida
     if (initialTab) {
       setActiveTab(initialTab);
     }
 
-    loadData();
-  }, [isAdmin, initialTab]);
+    setUsers(referenceUsers);
+    setCompanies(referenceCompanies);
+    setShipments(contextShipments);
+    setLoading(referenceLoading);
+  }, [
+    isAdmin,
+    initialTab,
+    referenceUsers,
+    referenceCompanies,
+    contextShipments,
+    referenceLoading,
+  ]);
 
 
 
   const loadData = async () => {
-    try {
-      setLoading(true);
-
-      // Carregar usuários
-      const usersSnapshot = await getDocs(collection(db, "users"));
-      const usersData = usersSnapshot.docs.map(
-        (doc) =>
-        ({
-          ...doc.data(),
-          uid: doc.id,
-        } as User)
-      );
-      setUsers(usersData);
-
-      // Carregar empresas
-      const companiesSnapshot = await getDocs(collection(db, "companies"));
-      const companiesData = companiesSnapshot.docs.map(
-        (doc) =>
-        ({
-          ...doc.data(),
-          id: doc.id,
-        } as Company)
-      );
-      setCompanies(companiesData);
-
-      // Carregar shipments
-      const shipmentsSnapshot = await getDocs(collection(db, "shipments"));
-      const shipmentsData = shipmentsSnapshot.docs.map(
-        (doc) =>
-        ({
-          ...doc.data(),
-          id: doc.id,
-        } as Shipment)
-      );
-      setShipments(shipmentsData);
-    } catch (error) {
-      console.error("Error loading admin data:", error);
-    } finally {
-      setLoading(false);
-    }
+    await refreshReferenceData();
   };
 
   const toggleUserStatus = async (userId: string, currentStatus: boolean) => {

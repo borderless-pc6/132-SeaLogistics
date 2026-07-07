@@ -48,10 +48,10 @@ export function ReportExportButton({
     return () => document.removeEventListener("mousedown", handleClickOutside);
   }, [open]);
 
-  const handleExportExcel = () => {
+  const handleExportExcel = async () => {
     setExporting("excel");
     try {
-      exportShipmentsReport(shipments);
+      await exportShipmentsReport(shipments);
       showSuccess(translations.exportSuccess);
       setOpen(false);
     } catch (error) {

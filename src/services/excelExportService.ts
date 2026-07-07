@@ -1,5 +1,4 @@
 import { saveAs } from "file-saver";
-import * as XLSX from "xlsx";
 import type { Shipment } from "../context/shipments-context";
 import { getStatusLabel } from "../constants/statusOptions";
 import {
@@ -16,18 +15,28 @@ function formatDate(dateString?: string): string {
   return date.toLocaleDateString("pt-BR");
 }
 
-function downloadWorkbook(workbook: XLSX.WorkBook, fileName: string): void {
-  const excelBuffer = XLSX.write(workbook, {
-    bookType: "xlsx",
-    type: "array",
-  });
-  const fileData = new Blob([excelBuffer], {
-    type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-  });
-  saveAs(fileData, fileName);
+async function getXLSX() {
+  return import("xlsx");
 }
 
-export function exportShipmentToExcel(shipment: Shipment): void {
+function downloadWorkbook(
+  workbook: import("xlsx").WorkBook,
+  fileName: string
+): void {
+  void import("xlsx").then((XLSX) => {
+    const excelBuffer = XLSX.write(workbook, {
+      bookType: "xlsx",
+      type: "array",
+    });
+    const fileData = new Blob([excelBuffer], {
+      type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+    });
+    saveAs(fileData, fileName);
+  });
+}
+
+export async function exportShipmentToExcel(shipment: Shipment): Promise<void> {
+  const XLSX = await import("xlsx");
   const workbook = XLSX.utils.book_new();
   const currentDate = new Date()
     .toLocaleDateString("pt-BR", {
@@ -118,7 +127,8 @@ export function exportShipmentToExcel(shipment: Shipment): void {
  * Planilha "STATUS OPERAÇÃO" — modelo do PDF de referência JABIL
  * (enviada ao cliente via WhatsApp com foto do navio).
  */
-export function exportJabilStatusSpreadsheet(shipment: Shipment): void {
+export async function exportJabilStatusSpreadsheet(shipment: Shipment): Promise<void> {
+  const XLSX = await getXLSX();
   const workbook = XLSX.utils.book_new();
   const reportDate = new Date()
     .toLocaleDateString("pt-BR", {
@@ -199,7 +209,8 @@ export function exportJabilStatusSpreadsheet(shipment: Shipment): void {
 }
 
 /** Modelo de campos para follow-up (referência: INFORMAÇÕES PARA FOLLOW UP DOS CLIENTES.xlsx) */
-export function downloadFollowUpFieldsTemplate(): void {
+export async function downloadFollowUpFieldsTemplate(): Promise<void> {
+  const XLSX = await getXLSX();
   const workbook = XLSX.utils.book_new();
   const sheetData = [
     ["INFORMAÇÕES QUE ENVIAMOS AO CLIENTE PRE - POS EMBARQUE"],
@@ -241,7 +252,8 @@ export function downloadFollowUpFieldsTemplate(): void {
   downloadWorkbook(workbook, "modelo-follow-up-clientes.xlsx");
 }
 
-export function exportShipmentsReport(shipments: Shipment[]): void {
+export async function exportShipmentsReport(shipments: Shipment[]): Promise<void> {
+  const XLSX = await getXLSX();
   const workbook = XLSX.utils.book_new();
   const generatedAt = new Date().toLocaleString("pt-BR");
 

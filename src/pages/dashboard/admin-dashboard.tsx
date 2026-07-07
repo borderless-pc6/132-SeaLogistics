@@ -1,6 +1,5 @@
 "use client";
 
-import { collection, getDocs } from "firebase/firestore";
 import {
   AlertCircle,
   Building2,
@@ -16,7 +15,7 @@ import {
   TrendingUp,
   Users,
 } from "lucide-react";
-import { useEffect, useState } from "react";
+import { Suspense, useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { AdminPanel } from "../../components/admin-panel/admin-panel";
 import ChatAssistant from "../../components/chat-assistant/chat-assistant";
@@ -25,14 +24,11 @@ import Navbar from "../../components/navbar/navbar";
 import { StatCardSkeleton } from "../../components/skeleton-loader/skeleton-loader";
 import { Tooltip } from "../../components/tooltip/tooltip";
 import { useLanguage } from "../../context/language-context";
+import { useReferenceData } from "../../context/reference-data-context";
 import { useShipments } from "../../context/shipments-context";
-import { db } from "../../lib/firebaseConfig";
 import { exportDashboardToPDF } from "../../services/pdfExportService";
-import type { Company } from "../../types/user";
 import "../../utils/animations.css";
 import "./dashboard.css";
-
-import type { Shipment } from "../../context/shipments-context";
 
 interface AdminDashboardStats {
   totalShipments: number;
@@ -47,10 +43,8 @@ interface AdminDashboardStats {
 
 export const AdminDashboard = () => {
   const { translations, language } = useLanguage();
-  const { shipments, loading: shipmentsLoading } = useShipments() as {
-    shipments: Shipment[];
-    loading: boolean;
-  };
+  const { shipments, loading: shipmentsLoading } = useShipments();
+  const { users, companies, loading: referenceLoading } = useReferenceData();
   const navigate = useNavigate();
   const [stats, setStats] = useState<AdminDashboardStats>({
     totalShipments: 0,
@@ -77,38 +71,28 @@ export const AdminDashboard = () => {
   };
 
   useEffect(() => {
-    const loadStats = async () => {
-      try {
-        setLoading(true);
+    const loadStats = () => {
+      setLoading(true);
 
-        // Carregar usuários
-        const usersSnapshot = await getDocs(collection(db, "users"));
-        const totalUsers = usersSnapshot.size;
+      const totalUsers = users.length;
+      const totalCompanies = companies.length;
+      const activeCompanies = companies.filter((c) => c.isActive).length;
 
-        // Carregar empresas
-        const companiesSnapshot = await getDocs(collection(db, "companies"));
-        const companies = companiesSnapshot.docs.map(
-          (doc) => doc.data() as Company
+      const now = new Date();
+      const currentMonth = now.getMonth();
+      const currentYear = now.getFullYear();
+
+      const normalizeStatus = (status: string) => {
+        return (
+          status
+            ?.toLowerCase()
+            .normalize("NFD")
+            .replace(/[\u0300-\u036f]/g, "")
+            .replace(/\s+/g, "-") || ""
         );
-        const totalCompanies = companies.length;
-        const activeCompanies = companies.filter((c) => c.isActive).length;
+      };
 
-        // Calcular estatísticas de shipments
-        const now = new Date();
-        const currentMonth = now.getMonth();
-        const currentYear = now.getFullYear();
-
-        const normalizeStatus = (status: string) => {
-          return (
-            status
-              ?.toLowerCase()
-              .normalize("NFD")
-              .replace(/[\u0300-\u036f]/g, "")
-              .replace(/\s+/g, "-") || ""
-          );
-        };
-
-        const totalShipments = shipments.length;
+      const totalShipments = shipments.length;
 
         const inTransit = shipments.filter((s) => {
           const status = normalizeStatus(s.status);
@@ -155,15 +139,11 @@ export const AdminDashboard = () => {
           totalCompanies,
           activeCompanies,
         });
-      } catch (error) {
-        console.error("Error loading admin stats:", error);
-      } finally {
-        setLoading(false);
-      }
+      setLoading(false);
     };
 
     loadStats();
-  }, [shipments]);
+  }, [shipments, users, companies]);
 
   const handleExportPDF = async () => {
     try {
@@ -187,7 +167,7 @@ export const AdminDashboard = () => {
     }
   };
 
-  if (loading || shipmentsLoading) {
+  if (loading || shipmentsLoading || referenceLoading) {
     return (
       <main className="dashboard-container">
         <Navbar />
@@ -452,7 +432,9 @@ export const AdminDashboard = () => {
         </div>
 
         {/* Gráficos e Estatísticas */}
-        <DashboardCharts shipments={shipments} isAdmin={true} />
+        <Suspense fallback={<StatCardSkeleton />}>
+          <DashboardCharts shipments={shipments} isAdmin={true} />
+        </Suspense>
       </div>
 
       {showAdminPanel && (

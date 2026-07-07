@@ -126,7 +126,7 @@ export function ShipmentDetailPage() {
               <button
                 type="button"
                 className="export-jabil-btn"
-                onClick={() => exportJabilStatusSpreadsheet(shipment)}
+                onClick={() => void exportJabilStatusSpreadsheet(shipment)}
               >
                 <FileSpreadsheet size={16} /> Planilha cliente
               </button>

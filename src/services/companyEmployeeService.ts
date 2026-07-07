@@ -20,11 +20,14 @@ export async function listCompanyEmployees(
   companyId: string
 ): Promise<CompanyEmployee[]> {
   const snapshot = await getDocs(
-    query(collection(db, "users"), where("companyId", "==", companyId))
+    query(
+      collection(db, "users"),
+      where("companyId", "==", companyId),
+      where("role", "==", UserRole.COMPANY_USER)
+    )
   );
 
   return snapshot.docs
-    .filter((docSnap) => docSnap.data().role === UserRole.COMPANY_USER)
     .map((docSnap) => {
     const data = docSnap.data();
     return {

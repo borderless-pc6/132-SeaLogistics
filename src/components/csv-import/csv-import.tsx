@@ -93,7 +93,7 @@ export function CsvImport() {
         <button
           type="button"
           className="csv-import-btn secondary"
-          onClick={downloadCSVTemplate}
+          onClick={() => void downloadCSVTemplate()}
         >
           <Download size={16} />
           Template embarque (JABIL)
@@ -102,7 +102,7 @@ export function CsvImport() {
         <button
           type="button"
           className="csv-import-btn secondary"
-          onClick={downloadFollowUpFieldsTemplate}
+          onClick={() => void downloadFollowUpFieldsTemplate()}
         >
           <Download size={16} />
           Modelo follow-up cliente

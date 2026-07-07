@@ -13,7 +13,7 @@ import {
   TrendingUp,
   Users,
 } from "lucide-react";
-import { useCallback, useEffect, useState } from "react";
+import { Suspense, useCallback, useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import ChatAssistant from "../../components/chat-assistant/chat-assistant";
 import { DashboardCharts } from "../../components/dashboard-charts";
@@ -411,7 +411,9 @@ export const Dashboard = () => {
         {/* Gráficos - Largura Total */}
         <div className="charts-section-full">
           <h2 className="section-title">{translations.analytics}</h2>
-          <DashboardCharts shipments={shipments} isAdmin={false} />
+          <Suspense fallback={<StatCardSkeleton />}>
+            <DashboardCharts shipments={shipments} isAdmin={false} />
+          </Suspense>
         </div>
       </div>
       <ChatAssistant />

@@ -16,6 +16,12 @@ import type {
   NotificationTemplateId,
 } from "../types/notificationTemplate";
 
+const TEMPLATE_CACHE_TTL_MS = 10 * 60 * 1000;
+const templateCache = new Map<
+  string,
+  { template: NotificationTemplate; fetchedAt: number }
+>();
+
 const DEFAULT_TEMPLATES: Record<NotificationTemplateId, NotificationTemplate> = {
   new_shipment_email: {
     id: "new_shipment_email",
@@ -280,12 +286,17 @@ export function interpolateTemplate(
 export async function getTemplate(
   id: NotificationTemplateId
 ): Promise<NotificationTemplate> {
+  const cached = templateCache.get(id);
+  if (cached && Date.now() - cached.fetchedAt < TEMPLATE_CACHE_TTL_MS) {
+    return cached.template;
+  }
+
   try {
     const docRef = doc(db, "notificationTemplates", id);
     const snapshot = await getDoc(docRef);
     if (snapshot.exists()) {
       const data = snapshot.data();
-      return {
+      const template = {
         id,
         name: data.name || DEFAULT_TEMPLATES[id].name,
         subject: data.subject ?? DEFAULT_TEMPLATES[id].subject,
@@ -293,11 +304,15 @@ export async function getTemplate(
         updatedAt: data.updatedAt?.toDate?.() || data.updatedAt,
         updatedBy: data.updatedBy,
       };
+      templateCache.set(id, { template, fetchedAt: Date.now() });
+      return template;
     }
   } catch (error) {
     console.warn(`Usando template padrão para ${id}:`, error);
   }
-  return DEFAULT_TEMPLATES[id];
+  const fallback = DEFAULT_TEMPLATES[id];
+  templateCache.set(id, { template: fallback, fetchedAt: Date.now() });
+  return fallback;
 }
 
 export async function saveTemplate(
@@ -311,6 +326,7 @@ export async function saveTemplate(
     updatedAt: new Date(),
     updatedBy,
   });
+  templateCache.delete(template.id);
 }
 
 export function getAllDefaultTemplates(): NotificationTemplate[] {

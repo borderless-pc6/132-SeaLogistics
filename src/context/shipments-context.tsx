@@ -7,19 +7,23 @@ import {
   doc,
   getDoc,
   getDocs,
+  limit,
   onSnapshot,
   orderBy,
   query,
   type Timestamp,
   updateDoc,
   where,
+  writeBatch,
 } from "firebase/firestore";
 import type React from "react";
 import {
   createContext,
   type ReactNode,
+  useCallback,
   useContext,
   useEffect,
+  useRef,
   useState,
 } from "react";
 import { db } from "../lib/firebaseConfig";
@@ -30,6 +34,8 @@ import {
 import { recordStatusHistory } from "../services/statusHistoryService";
 import { UserRole } from "../types/user";
 import { useAuth } from "./auth-context";
+
+export const SHIPMENTS_PAGE_SIZE = 50;
 
 export interface Shipment {
   id?: string;
@@ -53,24 +59,17 @@ export interface Shipment {
   imo?: string;
   actualDeparture?: string;
   reportedEta?: string;
-  /** Nome do navio (ex: CMA CGM VELA) */
   navio?: string;
-  /** Código de rastreio do navio (ex: 0PPKKE2MA) */
   navioCodigo?: string;
-  /** Tipo de container (20GP, 40HC, etc.) */
   containerType?: string;
   cargoReady?: string;
   coleta?: string;
   emptyToShipper?: string;
   readyToLoad?: string;
   loadedOnBoard?: string;
-  /** Porto/cidade rumo a (complemento de localização) */
   destinoRumo?: string;
-  /** ETA no porto de destino intermediário (chegada em "rumo a") */
   etaRumo?: string;
-  /** URL da imagem de posição do navio (mapa/foto enviada ao cliente) */
   shipMapImageUrl?: string;
-  /** CE — Conhecimento de Embarque / despacho aduaneiro */
   ce?: string;
   createdAt?: Timestamp | Date;
   updatedAt?: Timestamp | Date;
@@ -86,6 +85,10 @@ interface ShipmentsContextType {
   canCreateShipment: () => boolean;
   deleteAllShipments: () => Promise<void>;
   loading: boolean;
+  loadingMore: boolean;
+  hasMore: boolean;
+  loadMore: () => void;
+  refresh: () => void;
 }
 
 const ShipmentsContext = createContext<ShipmentsContextType | undefined>(
@@ -109,12 +112,32 @@ export const ShipmentsProvider: React.FC<ShipmentsProviderProps> = ({
 }) => {
   const [shipments, setShipments] = useState<Shipment[]>([]);
   const [loading, setLoading] = useState(true);
+  const [loadingMore, setLoadingMore] = useState(false);
+  const [hasMore, setHasMore] = useState(false);
+  const [loadedCount, setLoadedCount] = useState(SHIPMENTS_PAGE_SIZE);
+  const [refreshKey, setRefreshKey] = useState(0);
   const { currentUser, isAdmin, firebaseReady } = useAuth();
+  const isLoadingMoreRef = useRef(false);
+
+  const refresh = useCallback(() => {
+    isLoadingMoreRef.current = false;
+    setLoadingMore(false);
+    setLoadedCount(SHIPMENTS_PAGE_SIZE);
+    setRefreshKey((prev) => prev + 1);
+  }, []);
+
+  const loadMore = useCallback(() => {
+    if (loadingMore || !hasMore) return;
+    isLoadingMoreRef.current = true;
+    setLoadingMore(true);
+    setLoadedCount((prev) => prev + SHIPMENTS_PAGE_SIZE);
+  }, [loadingMore, hasMore]);
 
   useEffect(() => {
     if (!currentUser) {
       setShipments([]);
       setLoading(false);
+      setHasMore(false);
       return undefined;
     }
 
@@ -129,42 +152,55 @@ export const ShipmentsProvider: React.FC<ShipmentsProviderProps> = ({
       return () => clearTimeout(timeout);
     }
 
-    let q;
+    const isAdminOrOperator =
+      currentUser.role === UserRole.ADMIN ||
+      currentUser.role === UserRole.OPERATOR;
+    const isCompanyUser =
+      currentUser.role === UserRole.COMPANY_USER && !!currentUser.companyId;
 
-    if (isAdmin() || currentUser.role === UserRole.OPERATOR) {
-      q = query(collection(db, "shipments"), orderBy("createdAt", "desc"));
-    } else if (
-      currentUser.role === UserRole.COMPANY_USER &&
-      currentUser.companyId
-    ) {
-      // Usuário de empresa vê apenas os shipments da sua empresa
+    if (!isAdminOrOperator && !isCompanyUser) {
+      setShipments([]);
+      setLoading(false);
+      setHasMore(false);
+      return undefined;
+    }
+
+    if (!isLoadingMoreRef.current) {
+      setLoading(true);
+    }
+
+    let q;
+    if (isAdminOrOperator) {
+      q = query(
+        collection(db, "shipments"),
+        orderBy("createdAt", "desc"),
+        limit(loadedCount)
+      );
+    } else {
       q = query(
         collection(db, "shipments"),
         where("companyId", "==", currentUser.companyId),
-        orderBy("createdAt", "desc")
+        orderBy("createdAt", "desc"),
+        limit(loadedCount)
       );
-    } else {
-      // Fallback: sem shipments se não há permissão
-      setShipments([]);
-      setLoading(false);
-      return;
     }
 
     const unsubscribe = onSnapshot(
       q,
       (querySnapshot) => {
         const shipmentsData: Shipment[] = [];
-        querySnapshot.forEach((doc) => {
+        querySnapshot.forEach((docSnap) => {
           shipmentsData.push({
-            id: doc.id,
-            ...doc.data(),
+            id: docSnap.id,
+            ...docSnap.data(),
           } as Shipment);
         });
 
-        console.log("📦 Shipments carregados do Firestore:", shipmentsData);
-
         setShipments(shipmentsData);
+        setHasMore(querySnapshot.docs.length === loadedCount);
         setLoading(false);
+        setLoadingMore(false);
+        isLoadingMoreRef.current = false;
       },
       (error) => {
         console.error("Error fetching shipments:", error);
@@ -174,11 +210,20 @@ export const ShipmentsProvider: React.FC<ShipmentsProviderProps> = ({
           );
         }
         setLoading(false);
+        setLoadingMore(false);
+        isLoadingMoreRef.current = false;
       }
     );
 
     return () => unsubscribe();
-  }, [currentUser, isAdmin, firebaseReady]);
+  }, [
+    currentUser?.uid,
+    currentUser?.role,
+    currentUser?.companyId,
+    firebaseReady,
+    loadedCount,
+    refreshKey,
+  ]);
 
   const addShipment = async (
     shipmentData: Omit<Shipment, "id" | "createdAt" | "companyId"> & {
@@ -223,7 +268,6 @@ export const ShipmentsProvider: React.FC<ShipmentsProviderProps> = ({
         collection(db, "shipments"),
         shipmentWithCompany
       );
-      console.log("Shipment added with ID: ", docRef.id);
 
       try {
         await recordStatusHistory({
@@ -239,7 +283,6 @@ export const ShipmentsProvider: React.FC<ShipmentsProviderProps> = ({
         console.error("Erro ao registrar histórico de criação:", historyError);
       }
 
-      // Notificar cliente final (email + push)
       if (companyIdToUse) {
         try {
           await sendClientShipmentNotification({
@@ -267,10 +310,6 @@ export const ShipmentsProvider: React.FC<ShipmentsProviderProps> = ({
         throw new Error("Sem permissão para editar este shipment");
       }
 
-      console.log("=== INICIANDO ATUALIZAÇÃO DE SHIPMENT ===");
-      console.log("ID do shipment:", updatedShipment.id);
-      console.log("Company ID:", updatedShipment.companyId);
-
       const shipmentRef = doc(db, "shipments", updatedShipment.id);
       const currentShipmentDoc = await getDoc(shipmentRef);
 
@@ -281,10 +320,6 @@ export const ShipmentsProvider: React.FC<ShipmentsProviderProps> = ({
       const currentShipment = currentShipmentDoc.data();
       const oldStatus = currentShipment.status;
 
-      console.log("Status atual:", oldStatus);
-      console.log("Novo status:", updatedShipment.status);
-
-      // Atualizar todos os campos do shipment (incluindo companyId se o cliente for alterado)
       const updatePayload: Record<string, unknown> = {
         cliente: updatedShipment.cliente,
         operador: updatedShipment.operador,
@@ -331,7 +366,6 @@ export const ShipmentsProvider: React.FC<ShipmentsProviderProps> = ({
         }
       }
 
-      // Notificar cliente final quando o status mudar
       if (oldStatus !== updatedShipment.status) {
         try {
           await sendClientStatusUpdateNotification(updatedShipment, oldStatus);
@@ -341,11 +375,7 @@ export const ShipmentsProvider: React.FC<ShipmentsProviderProps> = ({
             error
           );
         }
-      } else {
-        console.log("Status não foi alterado");
       }
-
-      console.log("Shipment updated successfully:", updatedShipment.id);
     } catch (error) {
       console.error("Error updating shipment: ", error);
       throw error;
@@ -381,22 +411,21 @@ export const ShipmentsProvider: React.FC<ShipmentsProviderProps> = ({
         );
       }
 
-      console.log("Deletando todos os shipments do banco de dados...");
-
-      // Query all shipments
       const q = query(collection(db, "shipments"));
       const querySnapshot = await getDocs(q);
+      const docs = querySnapshot.docs;
 
-      // Delete each shipment
-      const deletePromises = querySnapshot.docs.map((document) =>
-        deleteDoc(doc(db, "shipments", document.id))
-      );
+      const BATCH_SIZE = 500;
+      for (let i = 0; i < docs.length; i += BATCH_SIZE) {
+        const batch = writeBatch(db);
+        const chunk = docs.slice(i, i + BATCH_SIZE);
+        chunk.forEach((document) => {
+          batch.delete(doc(db, "shipments", document.id));
+        });
+        await batch.commit();
+      }
 
-      await Promise.all(deletePromises);
-
-      console.log(
-        `${querySnapshot.docs.length} shipments deletados com sucesso`
-      );
+      refresh();
     } catch (error) {
       console.error("Error deleting all shipments: ", error);
       throw error;
@@ -411,6 +440,10 @@ export const ShipmentsProvider: React.FC<ShipmentsProviderProps> = ({
     canCreateShipment,
     deleteAllShipments,
     loading,
+    loadingMore,
+    hasMore,
+    loadMore,
+    refresh,
   };
 
   return (

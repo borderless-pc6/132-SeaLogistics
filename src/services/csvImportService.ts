@@ -1,5 +1,8 @@
-import * as XLSX from "xlsx";
 import type { Shipment } from "../context/shipments-context";
+
+async function getXLSX() {
+  return import("xlsx");
+}
 
 export type ShipmentImportRow = Omit<
   Shipment,
@@ -173,6 +176,7 @@ function parseRow(
 export async function parseSpreadsheetFile(
   file: File
 ): Promise<ShipmentImportRow[]> {
+  const XLSX = await getXLSX();
   const isExcel =
     file.name.toLowerCase().endsWith(".xlsx") ||
     file.name.toLowerCase().endsWith(".xls");
@@ -246,7 +250,8 @@ export const CSV_TEMPLATE_HEADERS = [
   "observacoes",
 ];
 
-export function downloadCSVTemplate(): void {
+export async function downloadCSVTemplate(): Promise<void> {
+  const XLSX = await getXLSX();
   const workbook = XLSX.utils.book_new();
   const sheet = XLSX.utils.aoa_to_sheet([
     CSV_TEMPLATE_HEADERS,
@@ -286,7 +291,8 @@ export function downloadCSVTemplate(): void {
   XLSX.writeFile(workbook, "template-embarque-internacional-jabil.xlsx");
 }
 
-export function downloadCSVTemplateLegacy(): void {
+export async function downloadCSVTemplateLegacy(): Promise<void> {
+  const XLSX = await getXLSX();
   const workbook = XLSX.utils.book_new();
   const sheet = XLSX.utils.aoa_to_sheet([
     CSV_TEMPLATE_HEADERS,

@@ -2,17 +2,16 @@
 
 import type React from "react";
 
-import { collection, getDocs, query, where } from "firebase/firestore";
 import { FileText, MapPin, Package, User } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import Navbar from "../../components/navbar/navbar";
 import { useAuth } from "../../context/auth-context";
 import { useLanguage } from "../../context/language-context";
+import { useReferenceData } from "../../context/reference-data-context";
 import { useShipments } from "../../context/shipments-context";
 import { useToast } from "../../context/toast-context";
 import { useFormValidation } from "../../hooks/useFormValidation";
-import { db } from "../../lib/firebaseConfig";
 import { getShipmentSchema } from "../../schemas/shipmentSchema";
 import "./novo-envio.css";
 
@@ -50,6 +49,8 @@ interface NovoEnvio {
 const NovoEnvioPage = () => {
   const navigate = useNavigate();
   const { addShipment } = useShipments();
+  const { getCompanyUsers, getStaffUsers, loading: referenceLoading } =
+    useReferenceData();
   const { canCreateShipment, isStaff, isCompanyUser, currentUser, currentCompany } = useAuth();
   const { translations } = useLanguage();
   const { showError, showSuccess } = useToast();
@@ -103,67 +104,29 @@ const NovoEnvioPage = () => {
   useEffect(() => {
     if (!isStaff()) return;
 
-    const fetchClientes = async () => {
-      setLoadingClientes(true);
-      try {
-        const usersQuery = query(
-          collection(db, "users"),
-          where("role", "==", "company_user")
-        );
-        const snapshot = await getDocs(usersQuery);
-        const clientesData: Cliente[] = snapshot.docs.map((doc) => {
-          const data = doc.data();
-          return {
-            id: doc.id,
-            nome: data.displayName || data.name || "Usuário",
-            empresa: data.companyName || "-",
-            email: data.email || "-",
-            companyId: data.companyId || undefined,
-          };
-        });
-        setClientes(clientesData);
-        if (clientesData.length === 1) {
-          setFormData((prev) => ({ ...prev, clienteId: clientesData[0].id }));
-        }
-      } catch (error) {
-        console.error("Erro ao buscar clientes:", error);
-        setClientes([]);
-      } finally {
-        setLoadingClientes(false);
-      }
-    };
-    fetchClientes();
-  }, [isStaff]);
+    setLoadingClientes(referenceLoading);
+    const clientesData: Cliente[] = getCompanyUsers().map((user) => ({
+      id: user.uid,
+      nome: user.displayName || "Usuário",
+      empresa: user.companyName || "-",
+      email: user.email || "-",
+      companyId: user.companyId,
+    }));
+    setClientes(clientesData);
+    if (clientesData.length === 1) {
+      setFormData((prev) => ({ ...prev, clienteId: clientesData[0].id }));
+    }
+  }, [isStaff, getCompanyUsers, referenceLoading]);
 
-  // Buscar operadores admins do Firestore
   useEffect(() => {
-    const fetchOperadores = async () => {
-      setLoadingOperadores(true);
-      try {
-        const staffQuery = query(
-          collection(db, "users"),
-          where("role", "in", ["admin", "operator"]),
-          where("isActive", "==", true)
-        );
-        const snapshot = await getDocs(staffQuery);
-        const operadoresData: Operador[] = snapshot.docs.map((doc) => {
-          const data = doc.data();
-          return {
-            id: doc.id,
-            nome: data.displayName || data.name || "Admin",
-            email: data.email || "",
-          };
-        });
-        setOperadores(operadoresData);
-      } catch (error) {
-        console.error("Erro ao buscar operadores:", error);
-        setOperadores([]);
-      } finally {
-        setLoadingOperadores(false);
-      }
-    };
-    fetchOperadores();
-  }, []);
+    setLoadingOperadores(referenceLoading);
+    const operadoresData: Operador[] = getStaffUsers().map((user) => ({
+      id: user.uid,
+      nome: user.displayName || "Admin",
+      email: user.email || "",
+    }));
+    setOperadores(operadoresData);
+  }, [getStaffUsers, referenceLoading]);
 
   const armadores = [
     "MSC",

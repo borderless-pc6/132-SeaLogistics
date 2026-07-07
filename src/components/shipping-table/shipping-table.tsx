@@ -1,8 +1,6 @@
 "use client";
 
 import { doc, getDoc } from "firebase/firestore";
-import jsPDF from "jspdf";
-import "jspdf-autotable";
 import { Check, Edit, Eye, FileSpreadsheet, FileText, FolderOpen, History, Ship } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
@@ -45,6 +43,9 @@ const ShippingTable = ({
     shipments: contextShipments,
     updateShipment,
     loading,
+    hasMore,
+    loadMore,
+    loadingMore,
   } = useShipments();
   const { isAdmin, isStaff } = useAuth();
   const { translations } = useLanguage();
@@ -289,9 +290,9 @@ const ShippingTable = ({
     return true;
   };
 
-  const exportToExcel = (shipment: Shipment) => {
+  const exportToExcel = async (shipment: Shipment) => {
     try {
-      exportShipmentToExcel(shipment);
+      await exportShipmentToExcel(shipment);
     } catch (error) {
       console.error("Erro ao exportar para Excel:", error);
       alert("Erro ao exportar para Excel. Tente novamente.");
@@ -300,11 +301,8 @@ const ShippingTable = ({
 
   const exportToPDF = async (shipment: Shipment) => {
     try {
-      console.log(
-        "🚀 Iniciando exportação PDF para:",
-        shipment.cliente,
-        shipment.numeroBl
-      );
+      const { default: jsPDF } = await import("jspdf");
+      await import("jspdf-autotable");
 
       const doc = new jsPDF();
 
@@ -616,6 +614,18 @@ const ShippingTable = ({
                 ))}
               </tbody>
             </table>
+            {hasMore && (
+              <div className="load-more-container" style={{ textAlign: "center", padding: "1rem" }}>
+                <button
+                  type="button"
+                  className="excel-button secondary"
+                  onClick={loadMore}
+                  disabled={loadingMore}
+                >
+                  {loadingMore ? "Carregando..." : "Carregar mais envios"}
+                </button>
+              </div>
+            )}
             <div className="pagination-container">
               <button
                 onClick={() => setCurrentPage((p) => Math.max(1, p - 1))}
