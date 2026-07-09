@@ -214,6 +214,7 @@ const SettingsContent = () => {
         name: userSettings.name,
         email: userSettings.email,
         phone: userSettings.phone,
+        whatsappPhone: userSettings.whatsappPhone || userSettings.phone,
         company: userSettings.company,
         position: userSettings.position,
         notifications: userSettings.notifications,
@@ -317,6 +318,26 @@ const SettingsContent = () => {
                       placeholder={translations.phonePlaceholder}
                       maxLength={15}
                     />
+                  </div>
+
+                  <div className="form-group">
+                    <label htmlFor="whatsappPhone">
+                      {translations.whatsapp}{" "}
+                      <span className="field-hint">
+                        {translations.whatsappForNotifications}
+                      </span>
+                    </label>
+                    <input
+                      type="tel"
+                      id="whatsappPhone"
+                      value={userSettings.whatsappPhone || ""}
+                      onChange={(e) =>
+                        handlePhoneChange("whatsappPhone", e.target.value)
+                      }
+                      placeholder={translations.phonePlaceholder}
+                      maxLength={15}
+                    />
+                    <small className="field-help">{translations.whatsappFormat}</small>
                   </div>
 
                   <div className="form-group">

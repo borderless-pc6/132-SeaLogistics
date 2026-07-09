@@ -144,6 +144,22 @@ export async function apiFetch(
   return fetch(`${API_URL}${path}`, { ...options, headers });
 }
 
+export async function loginWithOtpIdToken(idToken: string): Promise<LoginResponse> {
+  const response = await fetch(`${API_URL}/api/auth/otp-login`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ idToken }),
+  });
+
+  const data = (await response.json()) as LoginResponse;
+
+  if (!response.ok) {
+    throw new Error(data.error || "Erro ao autenticar com código");
+  }
+
+  return data;
+}
+
 export async function provisionFirebaseUser(data: {
   uid: string;
   email: string;

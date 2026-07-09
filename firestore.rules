@@ -78,7 +78,8 @@ service cloud.firestore {
       // Staff ou empresa pode criar envios (empresa só na própria companyId)
       allow create: if isStaff() ||
         (isCompanyUser() &&
-         request.resource.data.companyId == getUserCompanyId());
+         request.resource.data.companyId != null &&
+         isSameCompany(request.resource.data.companyId));
     }
     
     // Regras para histórico de status dos embarques
@@ -97,6 +98,12 @@ service cloud.firestore {
     match /notificationTemplates/{templateId} {
       allow read: if isStaff();
       allow write: if isAdmin();
+    }
+
+    // Configuração global do sistema (auto-tracking server-side)
+    match /systemConfig/{configId} {
+      allow read: if isStaff();
+      allow write: if isStaff();
     }
 
     // Notificações in-app (Firebase push + histórico no painel)

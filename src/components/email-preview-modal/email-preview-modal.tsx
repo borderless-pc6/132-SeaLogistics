@@ -3,6 +3,7 @@
 import { Copy, Mail, MessageCircle, X } from "lucide-react";
 import { useState } from "react";
 import { createPortal } from "react-dom";
+import { useToast } from "../../context/toast-context";
 import type { Shipment } from "../../context/shipments-context";
 import {
   buildJabilEmailSubject,
@@ -21,6 +22,7 @@ type PreviewTab = "email" | "whatsapp";
 export function EmailPreviewModal({ shipment, onClose }: EmailPreviewModalProps) {
   const [tab, setTab] = useState<PreviewTab>("email");
   const [copied, setCopied] = useState(false);
+  const { showSuccess } = useToast();
 
   const html = renderJabilEmailHtml(shipment);
   const subject = buildJabilEmailSubject(shipment);
@@ -34,6 +36,7 @@ export function EmailPreviewModal({ shipment, onClose }: EmailPreviewModalProps)
     try {
       await navigator.clipboard.writeText(whatsappText);
       setCopied(true);
+      showSuccess("Texto copiado — cole no WhatsApp do cliente.");
       setTimeout(() => setCopied(false), 2000);
     } catch {
       // ignore

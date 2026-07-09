@@ -10,7 +10,7 @@ O Sea Logistics é uma plataforma completa para gerenciamento de envios e logís
 - 👥 Sistema de autenticação e autorização
 - 📊 Dashboard administrativo com analytics
 - 📄 Integração com Excel/OneDrive
-- 💬 Notificações via WhatsApp
+- 💬 Notificações push (Firebase Cloud Messaging)
 - 📧 Envio de emails
 - 🌐 Suporte multi-idioma (PT, EN, ES)
 - 📱 Interface responsiva
@@ -84,10 +84,40 @@ src/
 
 O sistema possui três níveis de usuário:
 - **Administrador**: Acesso completo, pode criar envios e gerenciar usuários
-- **Empresa**: Visualiza apenas seus próprios envios
-- **Usuário**: Acesso básico
+- **Operador**: Gestão operacional de embarques
+- **Cliente (empresa)**: Visualiza apenas seus próprios envios
 
-As senhas são armazenadas com hash SHA-256 para segurança.
+### Login com senha (padrão)
+E-mail + senha com hash no Firestore e sessão JWT + Firebase Custom Token.
+
+### Login com código (Firebase Auth)
+Habilitado na aba **Código / Link** na tela de login (`VITE_FIREBASE_OTP_ENABLED=true`):
+
+| Canal | Firebase | Como funciona |
+|-------|----------|----------------|
+| **SMS** | Phone Authentication | Código de 6 dígitos via SMS (reCAPTCHA invisível) |
+| **E-mail** | Email Link | Link mágico no e-mail (não é código de 6 dígitos*) |
+
+\* OTP por e-mail com código numérico exige **Firebase Identity Platform** no console.
+
+**Configuração no Firebase Console (Blaze):**
+1. Authentication → Sign-in method → ativar **Phone** e **Email link (passwordless)**
+2. Authentication → Settings → **Authorized domains** → incluir seu domínio (ex.: `132-sealogistics.netlify.app` e `localhost`)
+3. Phone → configurar região e cotas SMS
+
+**Fluxo técnico:**
+1. Firebase valida telefone/e-mail (`src/services/firebaseOtpAuthService.ts`)
+2. Backend troca o `idToken` por sessão do app (`POST /api/auth/otp-login`)
+3. Usuário precisa existir em `users` com o mesmo **telefone** (`phone` ou `whatsappPhone`) ou **e-mail**
+
+**Arquivos principais:**
+- `src/services/firebaseOtpAuthService.ts` — envio/validação Firebase
+- `src/components/otp-login/otp-login.tsx` — UI na tela de login
+- `src/pages/auth/email-link-callback.tsx` — conclusão do login por link
+- `server/routes/auth.js` → `POST /api/auth/otp-login`
+- `src/context/auth-context.tsx` → `loginWithFirebaseCredential`
+
+As senhas tradicionais continuam com hash SHA-256 no Firestore.
 
 ## 🔧 Configuração
 
@@ -127,9 +157,22 @@ Gere a chave VAPID em Firebase Console > Project Settings > Cloud Messaging:
 - Sincronização bidirecional
 
 ### Notificações
-- Push notifications via Firebase Cloud Messaging (FCM)
-- Emails automáticos (SendGrid)
-- Atualizações de status
+- Push notifications via **Firebase Cloud Messaging (FCM)** — requer plano Blaze para Cloud Functions
+- E-mails automáticos via **SendGrid** (ou Gmail/Nodemailer como fallback)
+- Texto para WhatsApp disponível no preview de comunicação (cópia manual; sem Twilio)
+- Atualizações de status com link direto para `/envios/:id`
+
+### Auto-tracking (Cloud Functions)
+Deploy das functions agendadas:
+```bash
+cd functions && npm install && cd ..
+firebase deploy --only functions
+```
+A function `scheduledCarrierTracking` roda a cada 30 minutos e atualiza embarques ativos.
+Configuração em `systemConfig/autoTracking` no Firestore (toggle no simulador de rastreamento).
+
+### Página de demonstração (admin)
+- `/status-demo` — testes do seletor de status (somente admin)
 
 ## 🌍 Idiomas Suportados
 
@@ -144,6 +187,12 @@ O projeto está configurado para deploy no Netlify. Configure as variáveis de a
 
 ### Render
 O servidor backend pode ser deployado no Render usando o `Procfile` na pasta `server/`.
+
+### Firebase Hosting + Functions
+```bash
+npm run build
+firebase deploy --only hosting,functions,firestore:rules
+```
 
 ## 📄 Licença
 

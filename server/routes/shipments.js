@@ -12,6 +12,28 @@ function isStaff(role) {
   return role === "admin" || role === "operator";
 }
 
+async function deleteRelatedRecords(db, shipmentId) {
+  const collections = ["statusHistory", "documents"];
+  const refs = [];
+
+  for (const collectionName of collections) {
+    const snapshot = await db
+      .collection(collectionName)
+      .where("shipmentId", "==", shipmentId)
+      .get();
+    snapshot.docs.forEach((doc) => refs.push(doc.ref));
+  }
+
+  const BATCH_SIZE = 500;
+  for (let i = 0; i < refs.length; i += BATCH_SIZE) {
+    const batch = db.batch();
+    refs.slice(i, i + BATCH_SIZE).forEach((ref) => batch.delete(ref));
+    await batch.commit();
+  }
+
+  return refs.length;
+}
+
 router.use(authMiddleware);
 
 router.get("/", async (req, res) => {
@@ -70,7 +92,7 @@ router.get("/:id", async (req, res) => {
   }
 });
 
-router.post("/", requireRole("admin", "operator"), async (req, res) => {
+router.post("/", requireRole("admin", "operator", "company_user"), async (req, res) => {
   try {
     if (!isFirebaseAdminReady()) {
       return res.status(503).json({ success: false, error: "Firebase Admin não configurado" });
@@ -80,11 +102,35 @@ router.post("/", requireRole("admin", "operator"), async (req, res) => {
     const data = { ...req.body };
     delete data.id;
 
+    if (req.user.role === "company_user") {
+      if (!req.user.companyId) {
+        return res.status(403).json({
+          success: false,
+          error: "Sua conta não está vinculada a uma empresa",
+        });
+      }
+      data.companyId = req.user.companyId;
+    }
+
     data.createdAt = new Date();
     data.updatedAt = new Date();
 
     const docRef = await db.collection("shipments").add(data);
     const shipment = { id: docRef.id, ...data };
+
+    try {
+      await db.collection("statusHistory").add({
+        shipmentId: docRef.id,
+        eventType: "created",
+        toStatus: data.status || "documentacao",
+        changedBy: req.user.uid,
+        changedByName: req.user.email || "Sistema",
+        companyId: data.companyId || null,
+        changedAt: new Date(),
+      });
+    } catch (historyError) {
+      console.error("Erro ao registrar histórico de criação:", historyError.message);
+    }
 
     let notifications = { email: false, push: false };
     try {
@@ -214,6 +260,34 @@ router.patch("/:id/status", requireRole("admin", "operator", "company_user"), as
     });
   } catch (error) {
     console.error("Erro ao atualizar status:", error);
+    res.status(500).json({ success: false, error: error.message });
+  }
+});
+
+router.delete("/:id", requireRole("admin"), async (req, res) => {
+  try {
+    if (!isFirebaseAdminReady()) {
+      return res.status(503).json({ success: false, error: "Firebase Admin não configurado" });
+    }
+
+    const db = getFirestore();
+    const docRef = db.collection("shipments").doc(req.params.id);
+    const existing = await docRef.get();
+
+    if (!existing.exists) {
+      return res.status(404).json({ success: false, error: "Embarque não encontrado" });
+    }
+
+    const deletedRelated = await deleteRelatedRecords(db, req.params.id);
+    await docRef.delete();
+
+    res.json({
+      success: true,
+      id: req.params.id,
+      deletedRelated,
+    });
+  } catch (error) {
+    console.error("Erro ao excluir embarque:", error);
     res.status(500).json({ success: false, error: error.message });
   }
 });

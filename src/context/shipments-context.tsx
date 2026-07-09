@@ -26,11 +26,14 @@ import {
   useRef,
   useState,
 } from "react";
+import { useLocation } from "react-router-dom";
 import { db } from "../lib/firebaseConfig";
 import {
   sendClientShipmentNotification,
   sendClientStatusUpdateNotification,
 } from "../services/notificationService";
+import { deleteShipmentApi, createShipmentApi } from "../services/shipmentsApi";
+import { getAuthToken } from "../services/authApi";
 import { recordStatusHistory } from "../services/statusHistoryService";
 import { UserRole } from "../types/user";
 import { useAuth } from "./auth-context";
@@ -84,6 +87,7 @@ interface ShipmentsContextType {
   canEditShipment: (shipment: Shipment) => boolean;
   canCreateShipment: () => boolean;
   deleteAllShipments: () => Promise<void>;
+  deleteShipment: (shipmentId: string) => Promise<void>;
   loading: boolean;
   loadingMore: boolean;
   hasMore: boolean;
@@ -117,7 +121,10 @@ export const ShipmentsProvider: React.FC<ShipmentsProviderProps> = ({
   const [loadedCount, setLoadedCount] = useState(SHIPMENTS_PAGE_SIZE);
   const [refreshKey, setRefreshKey] = useState(0);
   const { currentUser, isAdmin, firebaseReady } = useAuth();
+  const location = useLocation();
   const isLoadingMoreRef = useRef(false);
+
+  const ROUTES_WITHOUT_SHIPMENTS = ["/change-password"];
 
   const refresh = useCallback(() => {
     isLoadingMoreRef.current = false;
@@ -135,6 +142,13 @@ export const ShipmentsProvider: React.FC<ShipmentsProviderProps> = ({
 
   useEffect(() => {
     if (!currentUser) {
+      setShipments([]);
+      setLoading(false);
+      setHasMore(false);
+      return undefined;
+    }
+
+    if (ROUTES_WITHOUT_SHIPMENTS.includes(location.pathname)) {
       setShipments([]);
       setLoading(false);
       setHasMore(false);
@@ -223,6 +237,7 @@ export const ShipmentsProvider: React.FC<ShipmentsProviderProps> = ({
     firebaseReady,
     loadedCount,
     refreshKey,
+    location.pathname,
   ]);
 
   const addShipment = async (
@@ -252,21 +267,46 @@ export const ShipmentsProvider: React.FC<ShipmentsProviderProps> = ({
         companyIdToUse = currentUser.companyId;
       }
 
-      const shipmentWithCompany: Record<string, unknown> = {
+      const shipmentPayload: Record<string, unknown> = {
         ...shipmentData,
         createdAt: new Date(),
         updatedAt: new Date(),
       };
 
       if (companyIdToUse !== undefined) {
-        shipmentWithCompany.companyId = companyIdToUse;
+        shipmentPayload.companyId = companyIdToUse;
       } else {
-        delete shipmentWithCompany.companyId;
+        delete shipmentPayload.companyId;
+      }
+
+      if (isCompanyUser_) {
+        const token = getAuthToken();
+        if (!token) {
+          throw new Error(
+            "Sessão inválida. Faça logout e login novamente para criar envios."
+          );
+        }
+
+        const { id } = await createShipmentApi(shipmentPayload);
+        setShipments((prev) => [
+          { id, ...(shipmentPayload as Shipment) },
+          ...prev,
+        ]);
+        refresh();
+        return;
+      }
+
+      const shouldUseApi = Boolean(getAuthToken()) && !firebaseReady;
+
+      if (shouldUseApi) {
+        await createShipmentApi(shipmentPayload);
+        refresh();
+        return;
       }
 
       const docRef = await addDoc(
         collection(db, "shipments"),
-        shipmentWithCompany
+        shipmentPayload
       );
 
       try {
@@ -295,6 +335,37 @@ export const ShipmentsProvider: React.FC<ShipmentsProviderProps> = ({
         }
       }
     } catch (error) {
+      const firestoreCode =
+        error && typeof error === "object" && "code" in error
+          ? String((error as { code?: string }).code)
+          : "";
+
+      if (firestoreCode === "permission-denied" && getAuthToken()) {
+        try {
+          let companyIdToUse = shipmentData.companyId;
+          if (currentUser?.role === UserRole.COMPANY_USER) {
+            companyIdToUse = currentUser.companyId;
+          }
+
+          const shipmentPayload: Record<string, unknown> = {
+            ...shipmentData,
+            createdAt: new Date(),
+            updatedAt: new Date(),
+          };
+
+          if (companyIdToUse !== undefined) {
+            shipmentPayload.companyId = companyIdToUse;
+          }
+
+          await createShipmentApi(shipmentPayload);
+          refresh();
+          return;
+        } catch (apiError) {
+          console.error("Fallback API ao criar shipment:", apiError);
+          throw apiError;
+        }
+      }
+
       console.error("Error adding shipment: ", error);
       throw error;
     }
@@ -432,6 +503,51 @@ export const ShipmentsProvider: React.FC<ShipmentsProviderProps> = ({
     }
   };
 
+  const deleteShipment = async (shipmentId: string) => {
+    if (!currentUser) {
+      throw new Error("Usuário não autenticado");
+    }
+
+    if (!isAdmin()) {
+      throw new Error("Apenas administradores podem excluir embarques");
+    }
+
+    try {
+      await deleteShipmentApi(shipmentId);
+      refresh();
+    } catch (apiError) {
+      console.warn("API delete indisponível, usando Firestore direto:", apiError);
+
+      const historyQuery = query(
+        collection(db, "statusHistory"),
+        where("shipmentId", "==", shipmentId)
+      );
+      const documentsQuery = query(
+        collection(db, "documents"),
+        where("shipmentId", "==", shipmentId)
+      );
+
+      const [historySnap, documentsSnap] = await Promise.all([
+        getDocs(historyQuery),
+        getDocs(documentsQuery),
+      ]);
+
+      const relatedDocs = [...historySnap.docs, ...documentsSnap.docs];
+      const BATCH_SIZE = 500;
+
+      for (let i = 0; i < relatedDocs.length; i += BATCH_SIZE) {
+        const batch = writeBatch(db);
+        relatedDocs.slice(i, i + BATCH_SIZE).forEach((document) => {
+          batch.delete(document.ref);
+        });
+        await batch.commit();
+      }
+
+      await deleteDoc(doc(db, "shipments", shipmentId));
+      refresh();
+    }
+  };
+
   const value: ShipmentsContextType = {
     shipments,
     addShipment,
@@ -439,6 +555,7 @@ export const ShipmentsProvider: React.FC<ShipmentsProviderProps> = ({
     canEditShipment,
     canCreateShipment,
     deleteAllShipments,
+    deleteShipment,
     loading,
     loadingMore,
     hasMore,

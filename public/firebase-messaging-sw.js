@@ -30,5 +30,6 @@ messaging.onBackgroundMessage((payload) => {
 self.addEventListener("notificationclick", (event) => {
   event.notification.close();
   const link = event.notification.data?.link || "/envios";
-  event.waitUntil(clients.openWindow(link));
+  const url = link.startsWith("http") ? link : `${self.location.origin}${link}`;
+  event.waitUntil(clients.openWindow(url));
 });

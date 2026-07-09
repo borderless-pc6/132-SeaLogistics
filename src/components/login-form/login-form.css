@@ -38,6 +38,35 @@
   object-fit: contain;
 }
 
+.login-mode-tabs {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
+  margin-bottom: 1rem;
+}
+
+.login-mode-tabs button {
+  padding: 10px 12px;
+  border: 1px solid var(--border-color, #d1d5db);
+  border-radius: 8px;
+  background: #fff;
+  font-weight: 600;
+  font-size: 0.875rem;
+  cursor: pointer;
+  color: #4b5563;
+}
+
+.login-mode-tabs button.active {
+  border-color: var(--primary-color, #118ab2);
+  color: var(--primary-color, #118ab2);
+  background: rgba(17, 138, 178, 0.08);
+}
+
+.login-mode-tabs button:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
 .login-form {
   display: flex;
   flex-direction: column;
@@ -74,7 +103,11 @@
   font-size: var(--text-base);
   font-weight: 600;
   cursor: pointer;
-  transition: all var(--transition-fast);
+  transition:
+    background var(--transition-fast),
+    transform var(--transition-fast),
+    box-shadow var(--transition-fast),
+    opacity var(--transition-fast);
   margin-top: 0.5rem;
   box-shadow: 0 4px 14px rgba(30, 77, 71, 0.3);
   width: 100%;
@@ -105,10 +138,18 @@
 .login-spinner {
   width: 18px;
   height: 18px;
+  flex-shrink: 0;
   border: 2px solid rgba(255, 255, 255, 0.3);
   border-top-color: white;
   border-radius: 50%;
-  animation: spin 0.8s linear infinite;
+  box-sizing: border-box;
+  animation: login-spin 0.8s linear infinite;
+}
+
+@keyframes login-spin {
+  to {
+    transform: rotate(360deg);
+  }
 }
 
 .login-progress {

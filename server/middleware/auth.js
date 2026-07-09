@@ -2,10 +2,21 @@ const jwt = require("jsonwebtoken");
 
 const JWT_SECRET =
   process.env.JWT_SECRET || "sealogistics-dev-secret-change-in-production";
-const JWT_EXPIRES_IN = process.env.JWT_EXPIRES_IN || "24h";
+const JWT_EXPIRES_IN = process.env.JWT_EXPIRES_IN;
+
+function getJwtExpiresIn() {
+  if (JWT_EXPIRES_IN) {
+    return JWT_EXPIRES_IN;
+  }
+
+  const now = new Date();
+  const endOfDay = new Date(now);
+  endOfDay.setHours(23, 59, 59, 999);
+  return Math.max(60, Math.floor((endOfDay.getTime() - now.getTime()) / 1000));
+}
 
 function signToken(payload) {
-  return jwt.sign(payload, JWT_SECRET, { expiresIn: JWT_EXPIRES_IN });
+  return jwt.sign(payload, JWT_SECRET, { expiresIn: getJwtExpiresIn() });
 }
 
 function verifyToken(token) {

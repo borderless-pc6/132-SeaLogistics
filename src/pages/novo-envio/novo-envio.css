@@ -94,8 +94,12 @@
 }
 
 .error-text {
+  display: block;
+  margin-top: 2px;
   font-size: var(--text-xs);
+  line-height: 1.4;
   color: var(--error);
+  font-weight: 500;
 }
 
 .form-actions {

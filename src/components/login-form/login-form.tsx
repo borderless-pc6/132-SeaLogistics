@@ -1,19 +1,25 @@
-"use client";
 import type React from "react";
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 
 import { useNavigate } from "react-router-dom";
 import { useAuth } from "../../context/auth-context";
 import { useToast } from "../../context/toast-context";
 import { createLoginSchema } from "../../schemas/loginSchema";
 import type { userForm } from "../../types/user";
+import { UserRole } from "../../types/user";
 import { mapAuthError, logAuthError } from "../../utils/authErrorHandler";
+import { consumeSessionExpiredFlag } from "../../utils/sessionUtils";
 import logo from "./../../assets/logo.png";
 import { useLanguage } from "./../../context/language-context";
 import { PasswordInput } from "../password-input/password-input";
+import { OtpLogin } from "../otp-login/otp-login";
+import { isFirebaseOtpEnabled } from "../../services/firebaseOtpAuthService";
 import "./login-form.css";
 
+type LoginMode = "password" | "otp";
+
 export default function LoginForm() {
+  const [loginMode, setLoginMode] = useState<LoginMode>("password");
   const [user, setUser] = useState<userForm>({
     email: "",
     password: "",
@@ -32,6 +38,12 @@ export default function LoginForm() {
   const loginSchema = useMemo(() => {
     return createLoginSchema(translations);
   }, [translations]);
+
+  useEffect(() => {
+    if (consumeSessionExpiredFlag()) {
+      showError(translations.sessionExpiredMessage);
+    }
+  }, [showError, translations.sessionExpiredMessage]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -56,15 +68,16 @@ export default function LoginForm() {
     try {
       setLoginStep("Autenticando...");
       const loggedInUser = await login(user.email, user.password);
-      
-      setLoginStep("Carregando dados do usuário...");
-      
+
       showSuccess("Login realizado com sucesso!");
-      console.log("Usuario logado com sucesso");
-      
-      setTimeout(() => {
-        navigate(loggedInUser.mustChangePassword ? "/change-password" : "/home");
-      }, 500);
+
+      if (loggedInUser.mustChangePassword) {
+        navigate("/change-password");
+      } else if (loggedInUser.role === UserRole.ADMIN) {
+        navigate("/admin-dashboard");
+      } else {
+        navigate("/home");
+      }
     } catch (err: unknown) {
       console.error("Erro ao logar:", err);
       logAuthError(err, "login");
@@ -88,6 +101,30 @@ export default function LoginForm() {
         <img src={logo} alt="Sea Logistics Logo" className="logo-image" />
       </div>
 
+      {isFirebaseOtpEnabled() && (
+        <div className="login-mode-tabs">
+          <button
+            type="button"
+            className={loginMode === "password" ? "active" : ""}
+            onClick={() => setLoginMode("password")}
+            disabled={isLoggingIn}
+          >
+            Senha
+          </button>
+          <button
+            type="button"
+            className={loginMode === "otp" ? "active" : ""}
+            onClick={() => setLoginMode("otp")}
+            disabled={isLoggingIn}
+          >
+            Código / Link
+          </button>
+        </div>
+      )}
+
+      {loginMode === "otp" && isFirebaseOtpEnabled() ? (
+        <OtpLogin />
+      ) : (
       <form onSubmit={handleSubmit} className="login-form" noValidate>
         <div className="form-group">
           <label htmlFor="email">{translations.email}</label>
@@ -136,6 +173,9 @@ export default function LoginForm() {
           </div>
         )}
       </form>
+      )}
+
+      {loginMode === "password" && (
       <div className="register-link">
         {translations.dontHaveAccount}
         <a
@@ -146,6 +186,7 @@ export default function LoginForm() {
           {translations.registerLink}
         </a>
       </div>
+      )}
     </div>
   );
 }

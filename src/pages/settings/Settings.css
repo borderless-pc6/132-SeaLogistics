@@ -241,6 +241,19 @@ input:checked + .slider:before {
   transform: translateX(26px);
 }
 
+.field-hint {
+  font-size: 0.8rem;
+  font-weight: 400;
+  color: #6c757d;
+}
+
+.field-help {
+  display: block;
+  margin-top: 4px;
+  font-size: 0.75rem;
+  color: #6c757d;
+}
+
 .settings-actions {
   margin-top: 2rem;
   display: flex;

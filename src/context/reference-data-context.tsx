@@ -49,13 +49,16 @@ export const ReferenceDataProvider: React.FC<ReferenceDataProviderProps> = ({
   children,
 }) => {
   const { currentUser, firebaseReady } = useAuth();
+  const isStaffUser =
+    currentUser?.role === UserRole.ADMIN ||
+    currentUser?.role === UserRole.OPERATOR;
   const [users, setUsers] = useState<User[]>([]);
   const [companies, setCompanies] = useState<Company[]>([]);
   const [loading, setLoading] = useState(true);
   const lastFetchedAt = useRef<number>(0);
 
   const fetchData = useCallback(async (force = false) => {
-    if (!currentUser || !firebaseReady) {
+    if (!currentUser || !firebaseReady || !isStaffUser) {
       setUsers([]);
       setCompanies([]);
       setLoading(false);
@@ -103,10 +106,10 @@ export const ReferenceDataProvider: React.FC<ReferenceDataProviderProps> = ({
     } finally {
       setLoading(false);
     }
-  }, [currentUser, firebaseReady]);
+  }, [currentUser, firebaseReady, isStaffUser]);
 
   useEffect(() => {
-    if (!currentUser || !firebaseReady) {
+    if (!currentUser || !firebaseReady || !isStaffUser) {
       setUsers([]);
       setCompanies([]);
       setLoading(false);
@@ -115,7 +118,7 @@ export const ReferenceDataProvider: React.FC<ReferenceDataProviderProps> = ({
     }
 
     void fetchData();
-  }, [currentUser?.uid, firebaseReady, fetchData]);
+  }, [currentUser?.uid, firebaseReady, isStaffUser, fetchData]);
 
   const refresh = useCallback(async () => {
     await fetchData(true);

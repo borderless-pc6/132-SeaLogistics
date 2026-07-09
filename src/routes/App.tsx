@@ -17,6 +17,7 @@ import { LoginPage as Login } from "../pages/login/login-page";
 import { RegisterPage as Register } from "../pages/register/register-page";
 import { PushNotificationListener } from "../components/push-notification-listener/push-notification-listener";
 import ExcelCallback from "../pages/auth/excel-callback";
+import EmailLinkCallback from "../pages/auth/email-link-callback";
 
 const AdminDashboard = lazy(
   () => import("../pages/dashboard/admin-dashboard").then((m) => ({ default: m.AdminDashboard }))
@@ -28,8 +29,14 @@ const ExcelSpecificTest = lazy(
   () => import("../components/excel-specific-test/excel-specific-test")
 );
 const NovoEnvioPage = lazy(() => import("../pages/novo-envio/novo-envio"));
+const StatusDemo = lazy(() =>
+  import("../pages/status-demo/status-demo").then((m) => ({ default: m.default }))
+);
 const Settings = lazy(() =>
   import("../pages/settings/Settings").then((m) => ({ default: m.Settings }))
+);
+const ProfilePage = lazy(() =>
+  import("../pages/profile/ProfilePage").then((m) => ({ default: m.ProfilePage }))
 );
 
 const LazyFallback = () => (
@@ -53,6 +60,7 @@ export const App = () => {
                   <Routes>
                     <Route path="/" element={<Login />} />
                     <Route path="/register" element={<Register />} />
+                    <Route path="/auth/email-link" element={<EmailLinkCallback />} />
 
                     <Route
                       element={
@@ -72,6 +80,7 @@ export const App = () => {
                       <Route path="/envios/:id" element={<ShipmentDetailPage />} />
                       <Route path="/novo-envio" element={<NovoEnvioPage />} />
                       <Route path="/settings" element={<Settings />} />
+                      <Route path="/perfil" element={<ProfilePage />} />
                       <Route path="/auth/callback" element={<ExcelCallback />} />
                       <Route
                         path="/excel-auth-callback"
@@ -90,6 +99,14 @@ export const App = () => {
                         element={
                           <AdminRoute>
                             <ExcelSpecificTest />
+                          </AdminRoute>
+                        }
+                      />
+                      <Route
+                        path="/status-demo"
+                        element={
+                          <AdminRoute>
+                            <StatusDemo />
                           </AdminRoute>
                         }
                       />

@@ -9,6 +9,7 @@ export interface UseFormValidationReturn<T> {
   errors: ValidationError;
   validateField: (fieldName: keyof T, value: any, fullData?: Partial<T>) => boolean;
   validateForm: (data: T) => boolean;
+  validateFormAndGetErrors: (data: T) => ValidationError | null;
   clearError: (fieldName: keyof T) => void;
   clearAllErrors: () => void;
   setError: (fieldName: keyof T, message: string) => void;
@@ -89,28 +90,34 @@ export function useFormValidation<T extends Record<string, any>>(
   );
 
   /**
+   * Valida o formulário completo e retorna os erros encontrados
+   */
+  const validateFormAndGetErrors = useCallback(
+    (data: T): ValidationError | null => {
+      const result = schema.safeParse(data);
+
+      if (result.success) {
+        setErrors({});
+        return null;
+      }
+
+      const newErrors: ValidationError = {};
+      result.error.errors.forEach((err) => {
+        const path = err.path.join(".");
+        newErrors[path] = err.message;
+      });
+      setErrors(newErrors);
+      return newErrors;
+    },
+    [schema]
+  );
+
+  /**
    * Valida o formulário completo
    */
   const validateForm = useCallback(
-    (data: T): boolean => {
-      try {
-        schema.parse(data);
-        setErrors({});
-        return true;
-      } catch (error) {
-        if (error instanceof z.ZodError) {
-          const newErrors: ValidationError = {};
-          error.errors.forEach((err) => {
-            const path = err.path.join('.');
-            newErrors[path] = err.message;
-          });
-          setErrors(newErrors);
-          return false;
-        }
-        return false;
-      }
-    },
-    [schema]
+    (data: T): boolean => validateFormAndGetErrors(data) === null,
+    [validateFormAndGetErrors]
   );
 
   /**
@@ -145,6 +152,7 @@ export function useFormValidation<T extends Record<string, any>>(
     errors,
     validateField,
     validateForm,
+    validateFormAndGetErrors,
     clearError,
     clearAllErrors,
     setError,

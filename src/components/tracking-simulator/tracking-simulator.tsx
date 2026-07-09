@@ -9,6 +9,10 @@ import {
   runCarrierBatchSimulation,
 } from "../../services/carrierApi";
 import {
+  getAutoTrackingConfig,
+  setAutoTrackingEnabled,
+} from "../../services/autoTrackingConfigService";
+import {
   getActiveShipmentsForTracking,
   simulateCarrierUpdate,
   TRACKING_INTERVAL_OPTIONS,
@@ -28,6 +32,8 @@ export function TrackingSimulator() {
   const [autoTracking, setAutoTracking] = useState(() => {
     return localStorage.getItem(STORAGE_KEY) === "true";
   });
+  const [serverTrackingEnabled, setServerTrackingEnabled] = useState(true);
+  const [lastServerRun, setLastServerRun] = useState<Date | null>(null);
   const [intervalSeconds, setIntervalSeconds] = useState(60);
   const [running, setRunning] = useState(false);
   const [logs, setLogs] = useState<TrackingLogEntry[]>([]);
@@ -106,7 +112,18 @@ export function TrackingSimulator() {
 
   useEffect(() => {
     localStorage.setItem(STORAGE_KEY, String(autoTracking));
+    void setAutoTrackingEnabled(autoTracking);
   }, [autoTracking]);
+
+  useEffect(() => {
+    void getAutoTrackingConfig().then((config) => {
+      setServerTrackingEnabled(config.enabled);
+      setLastServerRun(config.lastRunAt ?? null);
+      if (config.enabled && localStorage.getItem(STORAGE_KEY) === null) {
+        setAutoTracking(true);
+      }
+    });
+  }, []);
 
   useEffect(() => {
     if (intervalRef.current) {
@@ -139,10 +156,22 @@ export function TrackingSimulator() {
           <span className="tracking-badge">API ativa</span>
         )}
         <span
+          className={`tracking-badge ${serverTrackingEnabled ? "" : "inactive"}`}
+        >
+          {serverTrackingEnabled
+            ? "Cloud Function ativa (a cada 30 min)"
+            : "Cloud Function pausada"}
+        </span>
+        <span
           className={`tracking-badge ${autoTracking ? "" : "inactive"}`}
         >
-          {autoTracking ? "Auto-tracking ativo" : "Auto-tracking inativo"}
+          {autoTracking ? "Auto-tracking local ativo" : "Auto-tracking local inativo"}
         </span>
+        {lastServerRun && (
+          <span className="tracking-badge inactive">
+            Última execução servidor: {lastServerRun.toLocaleString("pt-BR")}
+          </span>
+        )}
       </p>
 
       <div className="tracking-simulator-controls">
@@ -150,7 +179,11 @@ export function TrackingSimulator() {
           <input
             type="checkbox"
             checked={autoTracking}
-            onChange={(e) => setAutoTracking(e.target.checked)}
+            onChange={(e) => {
+            const enabled = e.target.checked;
+            setAutoTracking(enabled);
+            setServerTrackingEnabled(enabled);
+          }}
           />
           Atualização automática
         </label>

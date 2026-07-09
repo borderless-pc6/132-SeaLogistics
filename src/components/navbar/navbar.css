@@ -151,6 +151,14 @@
   border-radius: var(--radius-full);
   background: rgba(255, 255, 255, 0.08);
   border: 1px solid rgba(255, 255, 255, 0.1);
+  cursor: pointer;
+  transition: background var(--transition-fast), border-color var(--transition-fast);
+}
+
+.app-header__user:hover,
+.app-header__user.active {
+  background: rgba(255, 255, 255, 0.14);
+  border-color: rgba(255, 255, 255, 0.2);
 }
 
 .app-header__user-name {
@@ -214,10 +222,6 @@
     display: none;
   }
 
-  .app-header__user {
-    display: none;
-  }
-
   .app-header__backdrop {
     display: block;
   }
@@ -258,6 +262,28 @@
   .app-header__mobile-link.active {
     background: rgba(37, 99, 235, 0.3);
     color: white;
+  }
+
+  .app-header__mobile-cta {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 14px 16px;
+    margin-top: var(--space-sm);
+    background: linear-gradient(135deg, var(--primary-color) 0%, var(--primary-light) 100%);
+    border: none;
+    border-radius: var(--radius-sm);
+    color: white;
+    font-size: var(--text-base);
+    font-weight: 600;
+    font-family: inherit;
+    cursor: pointer;
+    width: 100%;
+    text-align: left;
+  }
+
+  .app-header__mobile-cta:hover {
+    filter: brightness(1.05);
   }
 
   .app-header__mobile-logout {

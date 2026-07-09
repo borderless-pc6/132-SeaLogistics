@@ -1,12 +1,16 @@
 "use client";
 
 import { doc, getDoc } from "firebase/firestore";
-import { Check, Edit, Eye, FileSpreadsheet, FileText, FolderOpen, History, Ship } from "lucide-react";
+import { Check, Edit, Eye, FileSpreadsheet, FileText, FolderOpen, History, Loader2, Mail, Ship, Trash2 } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, useSearchParams } from "react-router-dom";
+import { ConfirmDialog } from "../confirm-dialog/confirm-dialog";
+import { EmailPreviewModal } from "../email-preview-modal/email-preview-modal";
+import { StatusBadge } from "../status-badge";
 import { useAuth } from "../../context/auth-context";
 import { useLanguage } from "../../context/language-context";
 import { useShipments, type Shipment } from "../../context/shipments-context";
+import { useToast } from "../../context/toast-context";
 import { db } from "../../lib/firebaseConfig";
 import { sendEmail } from "../../services/emailService";
 import {
@@ -42,14 +46,17 @@ const ShippingTable = ({
   const {
     shipments: contextShipments,
     updateShipment,
+    deleteShipment,
     loading,
     hasMore,
     loadMore,
     loadingMore,
   } = useShipments();
-  const { isAdmin, isStaff } = useAuth();
+  const { isAdmin, isStaff, canCreateShipment } = useAuth();
   const { translations } = useLanguage();
+  const { showError, showSuccess } = useToast();
   const navigate = useNavigate();
+  const [searchParams, setSearchParams] = useSearchParams();
 
   const shipments = propShipments || contextShipments;
 
@@ -77,43 +84,81 @@ const ShippingTable = ({
     return `${day}/${month}/${year}`;
   };
 
+  const formatUpdatedAt = (shipment: Shipment) => {
+    const raw = shipment.updatedAt;
+    if (!raw) return "—";
+
+    const date =
+      raw instanceof Date
+        ? raw
+        : typeof (raw as { toDate?: () => Date }).toDate === "function"
+          ? (raw as { toDate: () => Date }).toDate()
+          : new Date(String(raw));
+
+    if (isNaN(date.getTime())) return "—";
+    return date.toLocaleString("pt-BR", {
+      day: "2-digit",
+      month: "2-digit",
+      year: "2-digit",
+      hour: "2-digit",
+      minute: "2-digit",
+    });
+  };
+
   const [filters, setFilters] = useState<FilterOptions>({
     dateFrom: "",
     dateTo: "",
     month: "",
+    status: "",
     sortBy: "recent",
     sortOrder: "desc",
     searchTerm: "",
   });
 
-  // Aplicar filtros iniciais quando o componente carregar
+  const [deletingId, setDeletingId] = useState<string | null>(null);
+  const [shipmentToDelete, setShipmentToDelete] = useState<Shipment | null>(null);
+  const [previewShipment, setPreviewShipment] = useState<Shipment | null>(null);
+
+  // Sincronizar filtros iniciais da URL
   useEffect(() => {
-    if (initialFilters) {
-      const newFilters = { ...filters };
+    setFilters((prev) => {
+      const next = { ...prev };
 
-      // Aplicar filtro de status
-      if (initialFilters.status) {
-        // O filtro de status será aplicado na lógica de filtragem
+      if (initialFilters?.status !== undefined) {
+        next.status = initialFilters.status;
       }
 
-      // Aplicar filtro especial
-      if (initialFilters.filter === "this-month") {
-        const currentMonth = new Date().getMonth() + 1;
-        newFilters.month = currentMonth.toString();
+      if (initialFilters?.filter === "this-month") {
+        next.month = (new Date().getMonth() + 1).toString().padStart(2, "0");
+      } else if (initialFilters?.filter === "") {
+        next.month = "";
       }
 
-      setFilters(newFilters);
+      return next;
+    });
+  }, [initialFilters?.status, initialFilters?.filter]);
+
+  // Atualizar URL quando o filtro de status mudar
+  useEffect(() => {
+    const currentStatus = searchParams.get("status") || "";
+    if (filters.status === currentStatus) return;
+
+    const params = new URLSearchParams(searchParams);
+    if (filters.status) {
+      params.set("status", filters.status);
+    } else {
+      params.delete("status");
     }
-  }, [initialFilters]);
+    setSearchParams(params, { replace: true });
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- sincroniza só status → URL
+  }, [filters.status]);
 
   const filteredAndSortedShipments = useMemo(() => {
     let filtered = [...shipments];
 
-    // Aplicar filtro de status inicial
-    if (initialFilters?.status) {
-      filtered = filtered.filter(
-        (shipment) => shipment.status === initialFilters.status
-      );
+    const statusFilter = filters.status || initialFilters?.status;
+    if (statusFilter) {
+      filtered = filtered.filter((shipment) => shipment.status === statusFilter);
     }
 
     // Aplicar filtro de mês
@@ -247,8 +292,9 @@ const ShippingTable = ({
     return pages;
   };
 
-  const handleFiltersChange = (newFilters: Partial<FilterOptions>) => {
-    setFilters((prev) => ({ ...prev, ...newFilters }));
+  const handleFiltersChange = (newFilters: FilterOptions) => {
+    setFilters(newFilters);
+    setCurrentPage(1);
   };
 
   const handleClearFilters = () => {
@@ -256,10 +302,41 @@ const ShippingTable = ({
       dateFrom: "",
       dateTo: "",
       month: "",
+      status: "",
       sortBy: "recent",
       sortOrder: "desc",
       searchTerm: "",
     });
+    setCurrentPage(1);
+
+    const params = new URLSearchParams(searchParams);
+    params.delete("status");
+    params.delete("filter");
+    params.delete("period");
+    setSearchParams(params, { replace: true });
+  };
+
+  const requestDeleteShipment = (shipment: Shipment) => {
+    if (!shipment.id || !isAdmin()) return;
+    setShipmentToDelete(shipment);
+  };
+
+  const handleConfirmDelete = async () => {
+    if (!shipmentToDelete?.id) return;
+
+    setDeletingId(shipmentToDelete.id);
+    try {
+      await deleteShipment(shipmentToDelete.id);
+      showSuccess(translations.deleteSuccess);
+      setShipmentToDelete(null);
+    } catch (error) {
+      console.error("Erro ao excluir embarque:", error);
+      showError(
+        error instanceof Error ? error.message : "Não foi possível excluir o embarque."
+      );
+    } finally {
+      setDeletingId(null);
+    }
   };
 
   const handleEditShipment = (shipment: Shipment) => {
@@ -434,12 +511,17 @@ const ShippingTable = ({
                 : "Nenhum envio encontrado com os filtros aplicados. Tente ajustar os filtros de busca."
             }
             action={
-              shipments.length === 0
-                ? undefined
-                : {
-                    label: translations.clearFilters || "Limpar Filtros",
-                    onClick: handleClearFilters,
+              shipments.length === 0 && canCreateShipment()
+                ? {
+                    label: translations.novoEnvio || "Criar primeiro envio",
+                    onClick: () => navigate("/novo-envio"),
                   }
+                : shipments.length === 0
+                  ? undefined
+                  : {
+                      label: translations.clearFilters || "Limpar Filtros",
+                      onClick: handleClearFilters,
+                    }
             }
           />
         ) : (
@@ -461,6 +543,7 @@ const ShippingTable = ({
                   <th>{translations.booking}</th>
                   <th>{translations.invoice}</th>
                   <th>{translations.status || "Status"}</th>
+                  <th>Atualizado</th>
                   <th>{translations.imo}</th>
                   <th>{translations.actions}</th>
                 </tr>
@@ -502,14 +585,10 @@ const ShippingTable = ({
                     <td>{shipment.booking}</td>
                     <td>{shipment.invoice || "-"}</td>
                     <td>
-                      <span
-                        className={`status-badge status-${
-                          shipment.status?.toLowerCase().replace(/\s+/g, "-") ||
-                          "unknown"
-                        }`}
-                      >
-                        {shipment.status || "N/A"}
-                      </span>
+                      <StatusBadge status={shipment.status} />
+                    </td>
+                    <td title={`Última atualização: ${formatUpdatedAt(shipment)}`}>
+                      {formatUpdatedAt(shipment)}
                     </td>
                     <td>{shipment.imo || "-"}</td>
 
@@ -549,6 +628,15 @@ const ShippingTable = ({
                                 }}
                               >
                                 <Check size={20} />
+                              </button>
+                            </Tooltip>
+                            <Tooltip content="Preview e-mail / WhatsApp">
+                              <button
+                                type="button"
+                                className="action-icon preview-icon smooth-transition"
+                                onClick={() => setPreviewShipment(shipment)}
+                              >
+                                <Mail size={20} />
                               </button>
                             </Tooltip>
                           </>
@@ -608,6 +696,23 @@ const ShippingTable = ({
                             <FileText size={20} />
                           </button>
                         </Tooltip>
+
+                        {isAdmin() && shipment.id && (
+                          <Tooltip content={translations.delete}>
+                            <button
+                              type="button"
+                              className="action-icon delete-icon smooth-transition"
+                              onClick={() => requestDeleteShipment(shipment)}
+                              disabled={deletingId === shipment.id}
+                            >
+                              {deletingId === shipment.id ? (
+                                <Loader2 size={20} className="spin" />
+                              ) : (
+                                <Trash2 size={20} />
+                              )}
+                            </button>
+                          </Tooltip>
+                        )}
                       </div>
                     </td>
                   </tr>
@@ -742,6 +847,28 @@ const ShippingTable = ({
             </div>
           </div>
         )}
+
+        {previewShipment && (
+          <EmailPreviewModal
+            shipment={previewShipment}
+            onClose={() => setPreviewShipment(null)}
+          />
+        )}
+
+        <ConfirmDialog
+          open={Boolean(shipmentToDelete)}
+          title="Excluir embarque"
+          message={
+            shipmentToDelete
+              ? `Excluir o embarque BL ${shipmentToDelete.numeroBl || shipmentToDelete.booking || shipmentToDelete.id} do cliente ${shipmentToDelete.cliente || "—"}? Esta ação não pode ser desfeita.`
+              : ""
+          }
+          confirmLabel={translations.delete || "Excluir"}
+          cancelLabel={translations.cancel || "Cancelar"}
+          onConfirm={() => void handleConfirmDelete()}
+          onCancel={() => setShipmentToDelete(null)}
+          variant="danger"
+        />
       </div>
     </DropdownProvider>
   );

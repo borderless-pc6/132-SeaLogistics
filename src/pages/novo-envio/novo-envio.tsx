@@ -12,6 +12,7 @@ import { useReferenceData } from "../../context/reference-data-context";
 import { useShipments } from "../../context/shipments-context";
 import { useToast } from "../../context/toast-context";
 import { useFormValidation } from "../../hooks/useFormValidation";
+import { listCompanyEmployees } from "../../services/companyEmployeeService";
 import { getShipmentSchema } from "../../schemas/shipmentSchema";
 import "./novo-envio.css";
 
@@ -45,6 +46,23 @@ interface NovoEnvio {
   shipper: string;
   tipo: "Aéreo" | "Marítimo" | "Terrestre" | "";
 }
+
+const FIELD_LABELS: Record<keyof NovoEnvio, string> = {
+  tipo: "Tipo de transporte",
+  clienteId: "Cliente",
+  operador: "Responsável",
+  pol: "Origem (POL)",
+  pod: "Destino (POD)",
+  etdOrigem: "Data de partida (ETD)",
+  etaDestino: "Data de chegada (ETA)",
+  quantBox: "Quantidade de volumes",
+  status: "Status",
+  numeroBl: "Número do BL",
+  armador: "Armador",
+  booking: "Número do booking",
+  invoice: "Número da invoice",
+  shipper: "Shipper",
+};
 
 const NovoEnvioPage = () => {
   const navigate = useNavigate();
@@ -88,7 +106,21 @@ const NovoEnvioPage = () => {
   const shipmentSchema = useMemo(() => getShipmentSchema(formData.tipo), [formData.tipo]);
 
   // Hook de validação
-  const { errors, validateForm, validateField, clearAllErrors } = useFormValidation(shipmentSchema);
+  const { errors, validateFormAndGetErrors, validateField, clearAllErrors } =
+    useFormValidation(shipmentSchema);
+
+  const renderFieldError = (field: keyof NovoEnvio) =>
+    errors[field] ? (
+      <span className="error-text" role="alert">
+        {errors[field]}
+      </span>
+    ) : null;
+
+  const scrollToField = (field: keyof NovoEnvio) => {
+    const element = document.getElementById(String(field));
+    element?.scrollIntoView({ behavior: "smooth", block: "center" });
+    element?.focus({ preventScroll: true });
+  };
 
   // Limpar campos de origem e destino quando o tipo de transporte for alterado
   useEffect(() => {
@@ -119,6 +151,8 @@ const NovoEnvioPage = () => {
   }, [isStaff, getCompanyUsers, referenceLoading]);
 
   useEffect(() => {
+    if (!isStaff()) return;
+
     setLoadingOperadores(referenceLoading);
     const operadoresData: Operador[] = getStaffUsers().map((user) => ({
       id: user.uid,
@@ -126,7 +160,56 @@ const NovoEnvioPage = () => {
       email: user.email || "",
     }));
     setOperadores(operadoresData);
-  }, [getStaffUsers, referenceLoading]);
+  }, [isStaff, getStaffUsers, referenceLoading]);
+
+  useEffect(() => {
+    if (!isCompanyUser() || !currentUser?.companyId) return;
+
+    let cancelled = false;
+
+    const loadTeamMembers = async () => {
+      setLoadingOperadores(true);
+      try {
+        const employees = await listCompanyEmployees(currentUser.companyId!);
+        if (cancelled) return;
+
+        const operadoresData: Operador[] = employees
+          .filter((employee) => employee.isActive)
+          .map((employee) => ({
+            id: employee.uid,
+            nome: employee.displayName,
+            email: employee.email,
+          }));
+
+        setOperadores(operadoresData);
+
+        if (operadoresData.length === 1) {
+          setFormData((prev) => ({ ...prev, operador: operadoresData[0].id }));
+        } else if (
+          currentUser.uid &&
+          operadoresData.some((member) => member.id === currentUser.uid)
+        ) {
+          setFormData((prev) => ({ ...prev, operador: currentUser.uid }));
+        }
+      } catch (error) {
+        console.error("Erro ao carregar equipe:", error);
+        if (!cancelled) {
+          showError("Não foi possível carregar os membros da equipe.");
+          setOperadores([]);
+        }
+      } finally {
+        if (!cancelled) {
+          setLoadingOperadores(false);
+        }
+      }
+    };
+
+    void loadTeamMembers();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [isCompanyUser, currentUser?.companyId, currentUser?.uid, showError]);
 
   const armadores = [
     "MSC",
@@ -220,9 +303,22 @@ const NovoEnvioPage = () => {
       return;
     }
 
-    // Validar formulário completo
-    if (!validateForm(formData)) {
-      showError('Por favor, corrija os erros no formulário antes de continuar');
+    const validationData: NovoEnvio = {
+      ...formData,
+      clienteId: isCompanyUser()
+        ? currentUser?.uid ?? "company"
+        : formData.clienteId,
+      operador: isCompanyUser()
+        ? formData.operador || currentUser?.uid || ""
+        : formData.operador,
+    };
+
+    const validationErrors = validateFormAndGetErrors(validationData);
+    if (validationErrors) {
+      const firstField = Object.keys(validationErrors)[0] as keyof NovoEnvio;
+      const fieldLabel = FIELD_LABELS[firstField] ?? firstField;
+      showError(`${fieldLabel}: ${validationErrors[firstField]}`);
+      scrollToField(firstField);
       return;
     }
 
@@ -264,9 +360,15 @@ const NovoEnvioPage = () => {
         companyId = clienteSelecionado.companyId;
       }
 
+      const operadorSelecionado = operadores.find(
+        (item) => item.id === formData.operador
+      );
+      const operadorNome =
+        operadorSelecionado?.nome || formData.operador.trim();
+
       const shipmentData = {
         cliente: clienteEmpresa,
-        operador: formData.operador,
+        operador: operadorNome,
         pol: formData.pol,
         pod: formData.pod,
         etdOrigem: formData.etdOrigem,
@@ -308,7 +410,11 @@ const NovoEnvioPage = () => {
       navigate("/envios");
     } catch (error) {
       console.error("Erro ao criar shipment:", error);
-      showError("Erro ao criar shipment. Tente novamente.");
+      const message =
+        error instanceof Error
+          ? error.message
+          : "Erro ao criar shipment. Tente novamente.";
+      showError(message);
     } finally {
       setIsSubmitting(false);
     }
@@ -369,7 +475,7 @@ const NovoEnvioPage = () => {
                     <option value="Aéreo">Aéreo</option>
                     <option value="Terrestre">Terrestre</option>
                   </select>
-                  {errors.tipo && <span className="error-text">{errors.tipo}</span>}
+                  {renderFieldError("tipo")}
                 </div>
               </div>
             </div>
@@ -378,7 +484,11 @@ const NovoEnvioPage = () => {
             <div className="form-section">
               <div className="section-header">
                 <User size={20} />
-                <h2>{isCompanyUser() ? "Empresa e Operador" : "Cliente e Operador"}</h2>
+                <h2>
+                  {isCompanyUser()
+                    ? translations.companyAndTeamMember
+                    : translations.clientAndOperator}
+                </h2>
               </div>
 
               <div className="form-row">
@@ -401,8 +511,11 @@ const NovoEnvioPage = () => {
                       name="clienteId"
                       value={formData.clienteId}
                       onChange={handleInputChange}
+                      onBlur={() => handleBlur("clienteId")}
+                      className={errors.clienteId ? "input-error" : ""}
                       required
                       disabled={loadingClientes}
+                      aria-invalid={Boolean(errors.clienteId)}
                     >
                       <option value="">
                         {loadingClientes
@@ -415,25 +528,34 @@ const NovoEnvioPage = () => {
                         </option>
                       ))}
                     </select>
+                    {renderFieldError("clienteId")}
                   </div>
                 )}
 
                 <div className="form-group">
-                  <label htmlFor="operador">Operador *</label>
+                  <label htmlFor="operador">
+                    {isCompanyUser()
+                      ? translations.teamMember
+                      : translations.operator}{" "}
+                    *
+                  </label>
                   <select
                     id="operador"
                     name="operador"
                     value={formData.operador}
                     onChange={handleInputChange}
-                    onBlur={() => handleBlur('operador')}
-                    className={errors.operador ? 'input-error' : ''}
+                    onBlur={() => handleBlur("operador")}
+                    className={errors.operador ? "input-error" : ""}
                     required
                     disabled={loadingOperadores}
+                    aria-invalid={Boolean(errors.operador)}
                   >
                     <option value="">
                       {loadingOperadores
                         ? translations.loading
-                        : translations.selectOperator}
+                        : isCompanyUser()
+                          ? translations.selectTeamMember
+                          : translations.selectOperator}
                     </option>
                     {operadores.map((operador) => (
                       <option key={operador.id} value={operador.id}>
@@ -441,7 +563,7 @@ const NovoEnvioPage = () => {
                       </option>
                     ))}
                   </select>
-                  {errors.operador && <span className="error-text">{errors.operador}</span>}
+                  {renderFieldError("operador")}
                 </div>
               </div>
             </div>
@@ -497,7 +619,7 @@ const NovoEnvioPage = () => {
                           </option>
                         ))}
                   </select>
-                  {errors.pol && <span className="error-text">{errors.pol}</span>}
+                  {renderFieldError("pol")}
                 </div>
 
                 <div className="form-group">
@@ -543,7 +665,7 @@ const NovoEnvioPage = () => {
                           </option>
                         ))}
                   </select>
-                  {errors.pod && <span className="error-text">{errors.pod}</span>}
+                  {renderFieldError("pod")}
                 </div>
               </div>
 
@@ -560,7 +682,7 @@ const NovoEnvioPage = () => {
                     className={errors.etdOrigem ? 'input-error' : ''}
                     required
                   />
-                  {errors.etdOrigem && <span className="error-text">{errors.etdOrigem}</span>}
+                  {renderFieldError("etdOrigem")}
                 </div>
 
                 <div className="form-group">
@@ -577,7 +699,7 @@ const NovoEnvioPage = () => {
                     className={errors.etaDestino ? 'input-error' : ''}
                     required
                   />
-                  {errors.etaDestino && <span className="error-text">{errors.etaDestino}</span>}
+                  {renderFieldError("etaDestino")}
                 </div>
               </div>
             </div>
@@ -609,7 +731,7 @@ const NovoEnvioPage = () => {
                         </option>
                       ))}
                     </select>
-                    {errors.armador && <span className="error-text">{errors.armador}</span>}
+                    {renderFieldError("armador")}
                   </div>
                 </div>
               )}
@@ -628,33 +750,45 @@ const NovoEnvioPage = () => {
                     className={errors.numeroBl ? 'input-error' : ''}
                     required={formData.tipo === "Marítimo"}
                   />
-                  {errors.numeroBl && <span className="error-text">{errors.numeroBl}</span>}
+                  {renderFieldError("numeroBl")}
                 </div>
 
                 <div className="form-group">
-                  <label htmlFor="booking">Número do Booking {formData.tipo === "Aéreo" && "*"}</label>
+                  <label htmlFor="booking">
+                    Número do Booking {formData.tipo === "Aéreo" && "*"}
+                  </label>
                   <input
                     type="text"
                     id="booking"
                     name="booking"
                     value={formData.booking}
                     onChange={handleInputChange}
+                    onBlur={() => handleBlur("booking")}
                     placeholder="Ex: BK987654321"
-                    required
+                    className={errors.booking ? "input-error" : ""}
+                    required={formData.tipo === "Aéreo"}
+                    aria-invalid={Boolean(errors.booking)}
                   />
+                  {renderFieldError("booking")}
                 </div>
 
                 <div className="form-group">
-                  <label htmlFor="invoice">Número do Invoice *</label>
+                  <label htmlFor="invoice">
+                    Número do Invoice {formData.tipo === "Terrestre" && "*"}
+                  </label>
                   <input
                     type="text"
                     id="invoice"
                     name="invoice"
                     value={formData.invoice}
                     onChange={handleInputChange}
+                    onBlur={() => handleBlur("invoice")}
                     placeholder="Ex: INV123456789"
-                    required
+                    className={errors.invoice ? "input-error" : ""}
+                    required={formData.tipo === "Terrestre"}
+                    aria-invalid={Boolean(errors.invoice)}
                   />
+                  {renderFieldError("invoice")}
                 </div>
               </div>
             </div>

@@ -1,17 +1,19 @@
 "use client";
 
-import { ArrowLeft, Edit, FileSpreadsheet, Mail, MapPin, Package, Ship } from "lucide-react";
+import { ArrowLeft, Edit, FileSpreadsheet, Loader2, Mail, MapPin, Package, Ship, Trash2 } from "lucide-react";
 import { useEffect, useState } from "react";
 import { Link, useNavigate, useParams } from "react-router-dom";
+import { ConfirmDialog } from "../../components/confirm-dialog/confirm-dialog";
 import { EmailPreviewModal } from "../../components/email-preview-modal/email-preview-modal";
 import Navbar from "../../components/navbar/navbar";
 import EditShipmentModal from "../../components/edit-shipment-modal/edit-shipment-modal";
 import { ShipmentTimeline } from "../../components/shipment-timeline/shipment-timeline";
 import { TableSkeleton } from "../../components/skeleton-loader/skeleton-loader";
-import { getStatusLabel } from "../../constants/statusOptions";
+import { StatusBadge } from "../../components/status-badge";
 import { useAuth } from "../../context/auth-context";
 import { useLanguage } from "../../context/language-context";
 import { type Shipment, useShipments } from "../../context/shipments-context";
+import { useToast } from "../../context/toast-context";
 import {
   formatContainerSpec,
   formatNavioDisplay,
@@ -23,12 +25,15 @@ import "./shipment-detail-page.css";
 export function ShipmentDetailPage() {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
-  const { isStaff } = useAuth();
+  const { isStaff, isAdmin } = useAuth();
   const { translations } = useLanguage();
-  const { shipments, updateShipment, loading } = useShipments();
+  const { showError, showSuccess } = useToast();
+  const { shipments, updateShipment, deleteShipment, loading } = useShipments();
   const [shipment, setShipment] = useState<Shipment | null>(null);
   const [showEditModal, setShowEditModal] = useState(false);
   const [showEmailPreview, setShowEmailPreview] = useState(false);
+  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
+  const [isDeleting, setIsDeleting] = useState(false);
 
   useEffect(() => {
     if (!id) return;
@@ -49,6 +54,23 @@ export function ShipmentDetailPage() {
     await updateShipment(updated);
     setShipment(updated);
     setShowEditModal(false);
+  };
+
+  const handleConfirmDelete = async () => {
+    if (!shipment?.id) return;
+    setIsDeleting(true);
+    try {
+      await deleteShipment(shipment.id);
+      showSuccess(translations.deleteSuccess);
+      navigate("/envios");
+    } catch (error) {
+      showError(
+        error instanceof Error ? error.message : "Não foi possível excluir o embarque."
+      );
+    } finally {
+      setIsDeleting(false);
+      setShowDeleteConfirm(false);
+    }
   };
 
   if (loading && !shipment) {
@@ -102,34 +124,51 @@ export function ShipmentDetailPage() {
                 {shipment.cliente} · {shipment.tipo || "Marítimo"}
               </p>
             </div>
-            <span className={`status-badge status-${shipment.status}`}>
-              {getStatusLabel(shipment.status)}
-            </span>
+            <StatusBadge status={shipment.status} />
           </div>
 
-          {isStaff() && (
+          {(isStaff() || isAdmin()) && (
             <div className="shipment-detail-actions">
-              <button
-                type="button"
-                className="edit-btn"
-                onClick={() => setShowEditModal(true)}
-              >
-                <Edit size={16} /> Editar
-              </button>
-              <button
-                type="button"
-                className="preview-email-btn"
-                onClick={() => setShowEmailPreview(true)}
-              >
-                <Mail size={16} /> Preview comunicação
-              </button>
-              <button
-                type="button"
-                className="export-jabil-btn"
-                onClick={() => void exportJabilStatusSpreadsheet(shipment)}
-              >
-                <FileSpreadsheet size={16} /> Planilha cliente
-              </button>
+              {isStaff() && (
+                <>
+                  <button
+                    type="button"
+                    className="edit-btn"
+                    onClick={() => setShowEditModal(true)}
+                  >
+                    <Edit size={16} /> Editar
+                  </button>
+                  <button
+                    type="button"
+                    className="preview-email-btn"
+                    onClick={() => setShowEmailPreview(true)}
+                  >
+                    <Mail size={16} /> Preview comunicação
+                  </button>
+                  <button
+                    type="button"
+                    className="export-jabil-btn"
+                    onClick={() => void exportJabilStatusSpreadsheet(shipment)}
+                  >
+                    <FileSpreadsheet size={16} /> Planilha cliente
+                  </button>
+                </>
+              )}
+              {isAdmin() && (
+                <button
+                  type="button"
+                  className="delete-shipment-btn"
+                  onClick={() => setShowDeleteConfirm(true)}
+                  disabled={isDeleting}
+                >
+                  {isDeleting ? (
+                    <Loader2 size={16} className="spin" />
+                  ) : (
+                    <Trash2 size={16} />
+                  )}
+                  Excluir
+                </button>
+              )}
             </div>
           )}
         </div>
@@ -259,6 +298,17 @@ export function ShipmentDetailPage() {
           canEdit={isStaff()}
         />
       )}
+
+      <ConfirmDialog
+        open={showDeleteConfirm}
+        title="Excluir embarque"
+        message={`Excluir o embarque BL ${shipment.numeroBl || "—"} do cliente ${shipment.cliente || "—"}? Esta ação não pode ser desfeita.`}
+        confirmLabel={translations.delete || "Excluir"}
+        cancelLabel={translations.cancel || "Cancelar"}
+        onConfirm={() => void handleConfirmDelete()}
+        onCancel={() => setShowDeleteConfirm(false)}
+        variant="danger"
+      />
     </main>
   );
 }

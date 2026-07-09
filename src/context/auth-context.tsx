@@ -8,6 +8,7 @@ import {
   updateDoc,
   where,
 } from "firebase/firestore";
+import type { UserCredential } from "firebase/auth";
 import {
   onAuthStateChanged,
   signInWithCustomToken,
@@ -23,8 +24,14 @@ import React, {
   useState,
 } from "react";
 import { auth, db } from "../lib/firebaseConfig";
-import { clearAuthToken, getAuthToken, loginWithApi, refreshFirebaseSession, storeAuthToken } from "../services/authApi";
+import { clearAuthToken, getAuthToken, loginWithApi, loginWithOtpIdToken, refreshFirebaseSession, storeAuthToken } from "../services/authApi";
 import { ensureFirebaseSignIn } from "../services/firebaseAuthClient";
+import {
+  clearDailySession,
+  isDailySessionValid,
+  markSessionExpired,
+  storeDailySession,
+} from "../utils/sessionUtils";
 import { Company, User, UserRole } from "../types/user";
 import {
   isRetryableAuthError,
@@ -40,6 +47,7 @@ interface AuthContextType {
   currentUser: User | null;
   currentCompany: Company | null;
   login: (email: string, password: string) => Promise<User>;
+  loginWithFirebaseCredential: (credential: UserCredential) => Promise<User>;
   logout: () => void;
   isAdmin: () => boolean;
   isOperator: () => boolean;
@@ -80,6 +88,40 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
   const [firebaseReady, setFirebaseReady] = useState(false);
   const lastTokenCheckRef = useRef<number>(0);
   const tokenCheckIntervalRef = useRef<NodeJS.Timeout | null>(null);
+  const loginInProgressRef = useRef<string | null>(null);
+  const loadUserDataInflightRef = useRef<Map<string, Promise<User | null>>>(
+    new Map()
+  );
+
+  const clearLocalSession = () => {
+    setCurrentUser(null);
+    setCurrentCompany(null);
+    setFirebaseReady(false);
+    localStorage.removeItem("currentUser");
+    clearAuthToken();
+    clearDailySession();
+    lastTokenCheckRef.current = 0;
+  };
+
+  const expireDailySession = async (notify = true) => {
+    if (notify) {
+      markSessionExpired();
+    }
+
+    if (tokenCheckIntervalRef.current) {
+      clearInterval(tokenCheckIntervalRef.current);
+      tokenCheckIntervalRef.current = null;
+    }
+
+    try {
+      await signOut(auth);
+    } catch {
+      // ignora se não havia sessão Firebase
+    }
+
+    clearLocalSession();
+    setLoading(false);
+  };
 
   const syncFirebaseReady = (userId?: string | null) => {
     const ready = Boolean(
@@ -102,7 +144,14 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
   ): Promise<boolean> => {
     try {
       if (firebaseCustomToken) {
-        await establishFirebaseSession(firebaseCustomToken);
+        try {
+          await establishFirebaseSession(firebaseCustomToken);
+          if (syncFirebaseReady(uid)) {
+            return true;
+          }
+        } catch (error) {
+          console.warn("[Auth] Custom token inválido, tentando fallback:", error);
+        }
       }
 
       if (syncFirebaseReady(uid)) {
@@ -146,7 +195,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
 
   const tryRestoreFirebaseSession = async (): Promise<boolean> => {
     const savedToken = getAuthToken();
-    if (!savedToken) return false;
+    if (!savedToken || !isDailySessionValid()) return false;
 
     try {
       const { firebaseCustomToken } = await refreshFirebaseSession();
@@ -162,9 +211,28 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
   };
 
   useEffect(() => {
+    const savedToken = getAuthToken();
+    const savedUser = localStorage.getItem("currentUser");
+
+    if ((savedToken || savedUser) && !isDailySessionValid()) {
+      void expireDailySession();
+    }
+  }, []);
+
+  useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, async (firebaseUser) => {
       if (firebaseUser) {
+        if (!isDailySessionValid()) {
+          await expireDailySession();
+          return;
+        }
+
         syncFirebaseReady(firebaseUser.uid);
+
+        if (loginInProgressRef.current === firebaseUser.uid) {
+          return;
+        }
+
         try {
           await loadUserData(firebaseUser.uid);
         } catch {
@@ -176,6 +244,11 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
       setFirebaseReady(false);
       const savedUser = localStorage.getItem("currentUser");
       const savedToken = getAuthToken();
+
+      if ((savedUser || savedToken) && !isDailySessionValid()) {
+        await expireDailySession();
+        return;
+      }
 
       if (savedUser && savedToken) {
         try {
@@ -189,11 +262,13 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
         } catch {
           localStorage.removeItem("currentUser");
           clearAuthToken();
+          clearDailySession();
         }
       }
 
       if (savedUser && !getAuthToken()) {
         localStorage.removeItem("currentUser");
+        clearDailySession();
       }
 
       setCurrentUser(null);
@@ -243,77 +318,121 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
     };
   }, [currentUser?.uid, firebaseReady]);
 
-  const loadUserData = async (userId: string) => {
-    try {
-      console.log("Carregando dados do usuário do Firestore:", userId);
+  useEffect(() => {
+    if (!currentUser) {
+      return undefined;
+    }
 
-      // Usa retry para erros de rede
-      const userDoc = await retryWithBackoff(
-        async () => {
-          return await getDoc(doc(db, "users", userId));
-        },
-        {
-          maxRetries: 3,
-          initialDelay: 1000,
-          retryable: (error) => isRetryableAuthError(error),
+    if (!isDailySessionValid()) {
+      void expireDailySession();
+      return undefined;
+    }
+
+    const raw = localStorage.getItem("sessionExpiresAt");
+    const expiresAt = Number(raw);
+    if (!Number.isFinite(expiresAt)) {
+      return undefined;
+    }
+
+    const msUntilExpiry = expiresAt - Date.now();
+    if (msUntilExpiry <= 0) {
+      void expireDailySession();
+      return undefined;
+    }
+
+    const timeout = window.setTimeout(() => {
+      void expireDailySession();
+    }, msUntilExpiry + 100);
+
+    return () => window.clearTimeout(timeout);
+  }, [currentUser?.uid]);
+
+  const persistUserToStorage = (userData: User) => {
+    localStorage.setItem(
+      "currentUser",
+      JSON.stringify({
+        email: userData.email,
+        name: userData.displayName,
+        id: userData.uid,
+        role: userData.role,
+        mustChangePassword: userData.mustChangePassword ?? false,
+      })
+    );
+  };
+
+  const loadUserData = async (
+    userId: string,
+    hints?: { companyId?: string; role?: UserRole }
+  ): Promise<User | null> => {
+    const inflight = loadUserDataInflightRef.current.get(userId);
+    if (inflight) {
+      return inflight;
+    }
+
+    const promise = (async (): Promise<User | null> => {
+      try {
+        const roleHint = hints?.role;
+        const companyIdHint = hints?.companyId;
+        const shouldFetchCompany =
+          roleHint === UserRole.COMPANY_USER && Boolean(companyIdHint);
+
+        const [userDoc, companyDoc] = await Promise.all([
+          retryWithBackoff(
+            async () => getDoc(doc(db, "users", userId)),
+            {
+              maxRetries: 2,
+              initialDelay: 300,
+              retryable: (error) => isRetryableAuthError(error),
+            }
+          ),
+          shouldFetchCompany
+            ? retryWithBackoff(
+                async () => getDoc(doc(db, "companies", companyIdHint!)),
+                {
+                  maxRetries: 2,
+                  initialDelay: 300,
+                  retryable: (error) => isRetryableAuthError(error),
+                }
+              )
+            : Promise.resolve(null),
+        ]);
+
+        if (!userDoc.exists()) {
+          console.warn("Usuário não encontrado no Firestore:", userId);
+          localStorage.removeItem("currentUser");
+          setCurrentUser(null);
+          return null;
         }
-      );
 
-      if (userDoc.exists()) {
         const userData = { ...userDoc.data(), uid: userDoc.id } as User;
-        console.log("Dados do usuário carregados:", userData);
         setCurrentUser(userData);
         syncFirebaseReady(userId);
+        persistUserToStorage(userData);
 
-        if (!auth.currentUser) {
-          await new Promise<void>((resolve) => {
-            const timeout = window.setTimeout(resolve, 2500);
-            const unsub = onAuthStateChanged(auth, (firebaseUser) => {
-              if (firebaseUser?.uid === userId) {
-                syncFirebaseReady(userId);
-                window.clearTimeout(timeout);
-                unsub();
-                resolve();
-              }
-            });
-          });
-        }
-
-        if (shouldRegisterPush(userData)) {
-          registerFcmToken(userId).catch((err) =>
-            console.warn("[FCM] Falha ao registrar token:", err)
-          );
-        }
-
-        // Atualizar localStorage com dados mais recentes
-        localStorage.setItem(
-          "currentUser",
-          JSON.stringify({
-            email: userData.email,
-            name: userData.displayName,
-            id: userData.uid,
-            role: userData.role,
-          })
-        );
-
-        // Se for usuário de empresa, carregar dados da empresa
-        if (userData.role === UserRole.COMPANY_USER && userData.companyId) {
+        if (companyDoc?.exists()) {
+          const companyData = {
+            ...companyDoc.data(),
+            id: companyDoc.id,
+          } as Company;
+          setCurrentCompany(companyData);
+        } else if (
+          userData.role === UserRole.COMPANY_USER &&
+          userData.companyId
+        ) {
           try {
-            const companyDoc = await retryWithBackoff(
-              async () => {
-                return await getDoc(doc(db, "companies", userData.companyId!));
-              },
+            const lateCompanyDoc = await retryWithBackoff(
+              async () => getDoc(doc(db, "companies", userData.companyId!)),
               {
                 maxRetries: 2,
-                initialDelay: 1000,
+                initialDelay: 300,
                 retryable: (error) => isRetryableAuthError(error),
               }
             );
 
-            if (companyDoc.exists()) {
+            if (lateCompanyDoc.exists()) {
               const companyData = {
-                ...companyDoc.data(),
-                id: companyDoc.id,
+                ...lateCompanyDoc.data(),
+                id: lateCompanyDoc.id,
               } as Company;
               setCurrentCompany(companyData);
             }
@@ -321,25 +440,38 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
             logAuthError(error, "loadUserData - company");
           }
         }
-      } else {
-        console.warn("Usuário não encontrado no Firestore:", userId);
+
+        window.setTimeout(() => {
+          if (shouldRegisterPush(userData)) {
+            registerFcmToken(userId).catch((err) =>
+              console.warn("[FCM] Falha ao registrar token:", err)
+            );
+          }
+        }, 2000);
+
+        return userData;
+      } catch (error) {
+        logAuthError(error, "loadUserData");
+        const authError = mapAuthError(error);
+
+        if (authError.type === "token") {
+          logout();
+        }
+
         localStorage.removeItem("currentUser");
         setCurrentUser(null);
+        throw error;
+      } finally {
+        setLoading(false);
       }
-    } catch (error) {
-      logAuthError(error, "loadUserData");
-      const authError = mapAuthError(error);
+    })();
 
-      // Se for erro de token expirado, faz logout automático
-      if (authError.type === "token") {
-        logout();
-      }
+    loadUserDataInflightRef.current.set(userId, promise);
 
-      localStorage.removeItem("currentUser");
-      setCurrentUser(null);
-      throw error;
+    try {
+      return await promise;
     } finally {
-      setLoading(false);
+      loadUserDataInflightRef.current.delete(userId);
     }
   };
 
@@ -382,6 +514,11 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
       }
 
       lastTokenCheckRef.current = now;
+
+      if (!isDailySessionValid()) {
+        await expireDailySession();
+        return;
+      }
 
       try {
         const userDoc = await retryWithBackoff(
@@ -580,6 +717,8 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
       logAuthError(error, "login - updateLastLogin");
     }
 
+    loginInProgressRef.current = userDoc.id;
+
     await ensureFirebaseSessionForUser(
       userDoc.id,
       normalizedEmail,
@@ -589,6 +728,9 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
 
     setCurrentUser(finalUserData);
     syncFirebaseReady(userDoc.id);
+    setLoading(false);
+    persistUserToStorage(finalUserData);
+    storeDailySession();
 
     if (userData.role === UserRole.COMPANY_USER && userData.companyId) {
       try {
@@ -598,7 +740,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
           },
           {
             maxRetries: 2,
-            initialDelay: 1000,
+            initialDelay: 300,
             retryable: (error) => isRetryableAuthError(error),
           }
         );
@@ -615,17 +757,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
       }
     }
 
-    localStorage.setItem(
-      "currentUser",
-      JSON.stringify({
-        email: userData.email,
-        name: userData.displayName,
-        id: userDoc.id,
-        role: userData.role,
-        mustChangePassword: userData.mustChangePassword ?? false,
-      })
-    );
-
+    loginInProgressRef.current = null;
     return finalUserData;
   };
 
@@ -640,25 +772,44 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
           throw new Error(apiResponse.error || "Erro ao autenticar");
         }
 
+        const uid = apiResponse.user.uid;
+        loginInProgressRef.current = uid;
+
         if (apiResponse.token) {
           storeAuthToken(apiResponse.token);
         }
 
+        storeDailySession();
+
+        const hydratedUser = {
+          ...apiResponse.user,
+          uid,
+          isActive: apiResponse.user.isActive ?? true,
+          mustChangePassword: apiResponse.user.mustChangePassword ?? false,
+        } as User;
+
+        setCurrentUser(hydratedUser);
+        setLoading(false);
+        persistUserToStorage(hydratedUser);
+
         await ensureFirebaseSessionForUser(
-          apiResponse.user.uid,
+          uid,
           normalizedEmail,
           password,
           apiResponse.user.displayName || normalizedEmail,
           apiResponse.firebaseCustomToken
         );
 
-        await loadUserData(apiResponse.user.uid);
-        const userDoc = await getDoc(doc(db, "users", apiResponse.user.uid));
-        if (userDoc.exists()) {
-          return { ...userDoc.data(), uid: userDoc.id } as User;
-        }
-        return { ...apiResponse.user, uid: apiResponse.user.uid } as User;
+        const fullUser =
+          (await loadUserData(uid, {
+            role: apiResponse.user.role,
+            companyId: apiResponse.user.companyId ?? undefined,
+          })) ?? hydratedUser;
+
+        loginInProgressRef.current = null;
+        return fullUser;
       } catch (apiError) {
+        loginInProgressRef.current = null;
         const message =
           apiError instanceof Error ? apiError.message : String(apiError);
         const isCredentialError =
@@ -679,9 +830,61 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
         return await loginViaFirestore(normalizedEmail, password);
       }
     } catch (error) {
+      loginInProgressRef.current = null;
       logAuthError(error, "login");
       throw error;
     }
+  };
+
+  const loginWithFirebaseCredential = async (
+    credential: UserCredential
+  ): Promise<User> => {
+    const idToken = await credential.user.getIdToken(true);
+    const apiResponse = await loginWithOtpIdToken(idToken);
+
+    if (!apiResponse.user?.uid) {
+      throw new Error(apiResponse.error || "Erro ao autenticar com código");
+    }
+
+    const uid = apiResponse.user.uid;
+    loginInProgressRef.current = uid;
+
+    if (apiResponse.token) {
+      storeAuthToken(apiResponse.token);
+    }
+
+    storeDailySession();
+
+    try {
+      await signOut(auth);
+    } catch {
+      // ignora
+    }
+
+    if (apiResponse.firebaseCustomToken) {
+      await establishFirebaseSession(apiResponse.firebaseCustomToken);
+    }
+
+    const hydratedUser = {
+      ...apiResponse.user,
+      uid,
+      isActive: apiResponse.user.isActive ?? true,
+      mustChangePassword: apiResponse.user.mustChangePassword ?? false,
+    } as User;
+
+    setCurrentUser(hydratedUser);
+    setLoading(false);
+    persistUserToStorage(hydratedUser);
+    syncFirebaseReady(uid);
+
+    const fullUser =
+      (await loadUserData(uid, {
+        role: apiResponse.user.role,
+        companyId: apiResponse.user.companyId ?? undefined,
+      })) ?? hydratedUser;
+
+    loginInProgressRef.current = null;
+    return fullUser;
   };
 
   const logout = async () => {
@@ -705,12 +908,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
       // ignora se não havia sessão Firebase
     }
 
-    setCurrentUser(null);
-    setCurrentCompany(null);
-    setFirebaseReady(false);
-    localStorage.removeItem("currentUser");
-    clearAuthToken();
-    lastTokenCheckRef.current = 0;
+    clearLocalSession();
   };
 
   const isAdmin = (): boolean => {
@@ -815,6 +1013,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
     currentUser,
     currentCompany,
     login,
+    loginWithFirebaseCredential,
     logout,
     isAdmin,
     isOperator,

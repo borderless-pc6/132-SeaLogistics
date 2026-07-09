@@ -107,6 +107,37 @@
   background: #f0fdf4;
 }
 
+.delete-shipment-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  padding: 0.5rem 1rem;
+  background: #fff;
+  color: #b42318;
+  border: 1px solid #b42318;
+  border-radius: 8px;
+  cursor: pointer;
+  font-size: 0.9rem;
+}
+
+.delete-shipment-btn:hover:not(:disabled) {
+  background: #fef3f2;
+}
+
+.delete-shipment-btn:disabled {
+  opacity: 0.7;
+  cursor: not-allowed;
+}
+
+.delete-shipment-btn .spin {
+  animation: detail-spin 0.8s linear infinite;
+}
+
+@keyframes detail-spin {
+  from { transform: rotate(0deg); }
+  to { transform: rotate(360deg); }
+}
+
 .edit-btn {
   display: inline-flex;
   align-items: center;

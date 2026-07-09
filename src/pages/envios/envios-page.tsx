@@ -1,7 +1,7 @@
 "use client";
 
 import { useAuth } from "@/context/auth-context";
-import { BarChart2, FileUp, Radio } from "lucide-react";
+import { BarChart2, FileUp, Radio, X } from "lucide-react";
 import { useContext, useEffect, useState } from "react";
 import { useSearchParams } from "react-router-dom";
 import ChatAssistant from "../../components/chat-assistant/chat-assistant";
@@ -11,13 +11,14 @@ import { TrackingSimulator } from "../../components/tracking-simulator/tracking-
 import Navbar from "../../components/navbar/navbar";
 import { NavbarContext } from "../../components/navbar/navbar-context";
 import ShippingTable from "../../components/shipping-table/shipping-table";
+import { getStatusLabel } from "../../constants/statusOptions";
 import { useShipments } from "../../context/shipments-context";
 import "./envios-page.css";
 
 export const EnviosPage = () => {
   const { canImportShipments, isStaff } = useAuth();
   const { isCollapsed } = useContext(NavbarContext);
-  const [searchParams] = useSearchParams();
+  const [searchParams, setSearchParams] = useSearchParams();
   const [activeFilters, setActiveFilters] = useState({
     status: "",
     filter: "",
@@ -30,10 +31,22 @@ export const EnviosPage = () => {
 
   useEffect(() => {
     const status = searchParams.get("status") || "";
-    const filter = searchParams.get("filter") || "";
+    const filter =
+      searchParams.get("filter") || searchParams.get("period") || "";
 
     setActiveFilters({ status, filter });
   }, [searchParams]);
+
+  const clearUrlParam = (key: "status" | "filter") => {
+    const params = new URLSearchParams(searchParams);
+    if (key === "status") {
+      params.delete("status");
+    } else {
+      params.delete("filter");
+      params.delete("period");
+    }
+    setSearchParams(params, { replace: true });
+  };
 
   const handleShipmentsUpdate = () => {
     refresh();
@@ -110,22 +123,29 @@ export const EnviosPage = () => {
 
         {(activeFilters.status || activeFilters.filter) && (
           <div className="active-filters">
-            <h3>Filtros Ativos:</h3>
+            <h3>Filtros ativos</h3>
             <div className="filter-tags">
               {activeFilters.status && (
-                <span className="filter-tag">
-                  Status:{" "}
-                  {activeFilters.status === "em-transito"
-                    ? "Em Trânsito"
-                    : activeFilters.status === "concluido"
-                    ? "Entregue"
-                    : activeFilters.status === "documentacao"
-                    ? "Pendente"
-                    : activeFilters.status}
-                </span>
+                <button
+                  type="button"
+                  className="filter-tag filter-tag--dismissible"
+                  onClick={() => clearUrlParam("status")}
+                  aria-label="Remover filtro de status"
+                >
+                  Status: {getStatusLabel(activeFilters.status)}
+                  <X size={14} />
+                </button>
               )}
               {activeFilters.filter === "this-month" && (
-                <span className="filter-tag">Este Mês</span>
+                <button
+                  type="button"
+                  className="filter-tag filter-tag--dismissible"
+                  onClick={() => clearUrlParam("filter")}
+                  aria-label="Remover filtro deste mês"
+                >
+                  Este mês
+                  <X size={14} />
+                </button>
               )}
             </div>
           </div>

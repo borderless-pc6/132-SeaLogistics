@@ -9,6 +9,163 @@ const { hashPassword, verifyPassword } = require("../utils/passwordUtils");
 
 const router = express.Router();
 
+function normalizePhoneDigits(value) {
+  if (!value || typeof value !== "string") return "";
+  return value.replace(/\D/g, "");
+}
+
+function phoneMatches(storedValue, firebasePhone) {
+  const stored = normalizePhoneDigits(storedValue);
+  const incoming = normalizePhoneDigits(firebasePhone);
+  if (!stored || !incoming) return false;
+  if (stored === incoming) return true;
+  // BR: comparar últimos 10–11 dígitos (DDD + número)
+  const storedTail = stored.slice(-11);
+  const incomingTail = incoming.slice(-11);
+  return storedTail === incomingTail;
+}
+
+async function findUserForOtpLogin(db, { email, phoneNumber }) {
+  if (email) {
+    const normalizedEmail = email.trim().toLowerCase();
+    const byEmail = await db
+      .collection("users")
+      .where("email", "==", normalizedEmail)
+      .limit(1)
+      .get();
+    if (!byEmail.empty) {
+      return { doc: byEmail.docs[0], data: byEmail.docs[0].data() };
+    }
+  }
+
+  if (phoneNumber) {
+    const usersSnapshot = await db.collection("users").get();
+    for (const userDoc of usersSnapshot.docs) {
+      const data = userDoc.data();
+      if (
+        phoneMatches(data.phone, phoneNumber) ||
+        phoneMatches(data.whatsappPhone, phoneNumber)
+      ) {
+        return { doc: userDoc, data };
+      }
+    }
+  }
+
+  return null;
+}
+
+async function buildOtpLoginResponse(db, auth, userDoc, userData) {
+  const uid = userDoc.id;
+
+  if (!userData.isActive) {
+    const error = new Error("Usuário inativo. Contacte o administrador.");
+    error.statusCode = 401;
+    throw error;
+  }
+
+  await db.collection("users").doc(uid).set(
+    {
+      lastLogin: new Date(),
+      firebaseAuthUid: userData.firebaseAuthUid || null,
+    },
+    { merge: true }
+  );
+
+  let firebaseCustomToken = null;
+  try {
+    firebaseCustomToken = await auth.createCustomToken(uid, {
+      role: userData.role,
+      companyId: userData.companyId || null,
+    });
+  } catch (tokenError) {
+    console.error("Erro ao gerar custom token OTP:", tokenError.message);
+  }
+
+  const jwtToken = signToken({
+    uid,
+    email: userData.email,
+    role: userData.role,
+    companyId: userData.companyId || null,
+  });
+
+  return {
+    success: true,
+    token: jwtToken,
+    firebaseCustomToken,
+    user: {
+      uid,
+      email: userData.email,
+      displayName: userData.displayName || userData.name,
+      role: userData.role,
+      companyId: userData.companyId || null,
+      companyName: userData.companyName || null,
+      isActive: userData.isActive,
+      mustChangePassword: userData.mustChangePassword ?? false,
+    },
+  };
+}
+
+router.post("/otp-login", async (req, res) => {
+  try {
+    const { idToken } = req.body;
+
+    if (!idToken) {
+      return res.status(400).json({
+        success: false,
+        error: "Token Firebase (idToken) é obrigatório",
+      });
+    }
+
+    if (!isFirebaseAdminReady()) {
+      return res.status(503).json({
+        success: false,
+        error: "Firebase Admin não configurado",
+      });
+    }
+
+    const auth = getAuth();
+    const db = getFirestore();
+    const decoded = await auth.verifyIdToken(idToken);
+
+    const matched = await findUserForOtpLogin(db, {
+      email: decoded.email || null,
+      phoneNumber: decoded.phone_number || null,
+    });
+
+    if (!matched) {
+      return res.status(404).json({
+        success: false,
+        error:
+          "Usuário não encontrado. Cadastre seu telefone ou e-mail nas configurações ou peça ao administrador.",
+      });
+    }
+
+    await db.collection("users").doc(matched.doc.id).set(
+      {
+        firebaseAuthUid: decoded.uid,
+        updatedAt: new Date(),
+      },
+      { merge: true }
+    );
+
+    const payload = await buildOtpLoginResponse(
+      db,
+      auth,
+      matched.doc,
+      matched.data
+    );
+
+    res.json(payload);
+  } catch (error) {
+    const status = error.statusCode || 500;
+    console.error("Erro no login OTP:", error);
+    res.status(status).json({
+      success: false,
+      error: error.message || "Erro ao autenticar com código",
+    });
+  }
+});
+
 router.post("/login", async (req, res) => {
   try {
     const email = (req.body.email || "").trim().toLowerCase();
@@ -98,6 +255,7 @@ router.post("/login", async (req, res) => {
         companyId: userData.companyId || null,
         companyName: userData.companyName || null,
         isActive: userData.isActive,
+        mustChangePassword: userData.mustChangePassword ?? false,
       },
     });
   } catch (error) {

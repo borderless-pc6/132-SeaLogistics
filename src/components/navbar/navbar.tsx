@@ -1,6 +1,6 @@
 "use client";
 
-import { Home, LogOut, Menu, Plus, Settings, Ship, Users, X } from "lucide-react";
+import { Home, Menu, Plus, Settings, Ship, Users, X } from "lucide-react";
 import { useState } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
 import logo2 from "../../assets/logo2.png";
@@ -12,11 +12,12 @@ const Navbar = () => {
   const [mobileOpen, setMobileOpen] = useState(false);
   const navigate = useNavigate();
   const location = useLocation();
-  const { isStaff, isAdmin, canCreateShipment, canManageEmployees, logout, currentUser } = useAuth();
+  const { isStaff, isAdmin, canCreateShipment, canManageEmployees, currentUser } = useAuth();
   const { translations } = useLanguage();
 
   const getActiveItem = () => {
     if (location.pathname.includes("equipe")) return "equipe";
+    if (location.pathname.includes("perfil")) return "perfil";
     if (location.pathname.includes("settings")) return "settings";
     if (location.pathname.includes("novo-envio")) return "novo-envio";
     if (location.pathname.includes("envios")) return "envios";
@@ -27,12 +28,6 @@ const Navbar = () => {
 
   const handleNavigate = (path: string) => {
     navigate(path);
-    setMobileOpen(false);
-  };
-
-  const handleLogout = () => {
-    logout();
-    navigate("/");
     setMobileOpen(false);
   };
 
@@ -130,18 +125,16 @@ const Navbar = () => {
             {isAdmin() && (
               <span className="app-header__role-badge">Admin</span>
             )}
-            <div className="app-header__user" title={currentUser?.email || ""}>
+            <button
+              type="button"
+              className={`app-header__user ${activeItem === "perfil" ? "active" : ""}`}
+              onClick={() => handleNavigate("/perfil")}
+              title={currentUser?.email || translations.profile}
+              aria-label={translations.profile}
+            >
               <span className="app-header__user-name">
                 {currentUser?.displayName?.split(" ")[0] || "Usuário"}
               </span>
-            </div>
-            <button
-              type="button"
-              className="app-header__logout"
-              onClick={handleLogout}
-              aria-label={translations.sair}
-            >
-              <LogOut size={18} />
             </button>
           </div>
         </div>
@@ -165,10 +158,16 @@ const Navbar = () => {
                 </button>
               );
             })}
-            <button type="button" className="app-header__mobile-logout" onClick={handleLogout}>
-              <LogOut size={20} />
-              <span>{translations.sair}</span>
-            </button>
+            {canCreateShipment() && activeItem !== "novo-envio" && (
+              <button
+                type="button"
+                className="app-header__mobile-cta"
+                onClick={() => handleNavigate("/novo-envio")}
+              >
+                <Plus size={20} />
+                <span>{translations.novoEnvio}</span>
+              </button>
+            )}
           </nav>
         </>
       )}

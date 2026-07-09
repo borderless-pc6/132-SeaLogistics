@@ -23,6 +23,7 @@ import { Tooltip } from "../../components/tooltip/tooltip";
 import { useAuth } from "../../context/auth-context";
 import { useLanguage } from "../../context/language-context";
 import { type Shipment, useShipments } from "../../context/shipments-context";
+import { getStatusColor } from "../../utils/statusUtils";
 import "../../utils/animations.css";
 import "./user-dashboard.css";
 
@@ -175,32 +176,6 @@ export const Dashboard = () => {
     return date.toLocaleDateString("pt-BR");
   };
 
-  const getStatusColor = (status: string) => {
-    const normalizedStatus =
-      status
-        ?.toLowerCase()
-        .normalize("NFD")
-        .replace(/[\u0300-\u036f]/g, "")
-        .replace(/\s+/g, "-") || "";
-
-    switch (normalizedStatus) {
-      case "documentacao":
-      case "pendente":
-        return "#073b4c";
-      case "agendado":
-        return "#118ab2";
-      case "em-transito":
-      case "embarcado":
-        return "#ffd166";
-      case "concluido":
-      case "entregue":
-        return "#06d6a0";
-      default:
-        return "#6c757d";
-    }
-  };
-
-  // Se for admin ou ainda carregando, não mostrar o dashboard
   if (isPageLoading || isAdmin()) {
     return (
       <main className="dashboard-container">
@@ -302,7 +277,7 @@ export const Dashboard = () => {
 
             <div
               className="stat-card"
-              onClick={() => navigate("/envios?period=this-month")}
+              onClick={() => navigate("/envios?filter=this-month")}
             >
               <div className="stat-icon this-month">
                 <TrendingUp size={24} />

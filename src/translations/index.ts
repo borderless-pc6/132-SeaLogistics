@@ -49,6 +49,11 @@ export const translations = {
     novoEnvio: "New Shipment",
     configuracoes: "Settings",
     sair: "Logout",
+    confirmLogoutTitle: "Sign out?",
+    confirmLogoutMessage: "Are you sure you want to sign out of your account?",
+    confirmLogoutButton: "Sign out",
+    sessionExpiredMessage:
+      "Your session has expired. Please sign in again to continue.",
 
     // Accessibility
     collapseMenu: "Collapse menu",
@@ -214,6 +219,10 @@ export const translations = {
     finish: "Finish",
     selectClient: "Select a client",
     selectOperator: "Select an operator",
+    selectTeamMember: "Select a team member",
+    teamMember: "Team member",
+    companyAndTeamMember: "Company and team member",
+    clientAndOperator: "Client and operator",
     pleaseSelectValidClient: "Please select a valid client.",
 
     // Messages
@@ -536,6 +545,11 @@ export const translations = {
     novoEnvio: "Novo Envio",
     configuracoes: "Configurações",
     sair: "Sair",
+    confirmLogoutTitle: "Deseja sair?",
+    confirmLogoutMessage: "Tem certeza que deseja sair da sua conta?",
+    confirmLogoutButton: "Sair",
+    sessionExpiredMessage:
+      "Sua sessão expirou. Faça login novamente para continuar.",
 
     // Accessibility
     collapseMenu: "Recolher menu",
@@ -680,6 +694,10 @@ export const translations = {
     finish: "Finalizar",
     selectClient: "Selecione um cliente",
     selectOperator: "Selecione um operador",
+    selectTeamMember: "Selecione um membro da equipe",
+    teamMember: "Responsável na empresa",
+    companyAndTeamMember: "Empresa e responsável",
+    clientAndOperator: "Cliente e operador",
     pleaseSelectValidClient: "Por favor, selecione um cliente válido.",
 
     // Messages
@@ -1007,6 +1025,11 @@ export const translations = {
     novoEnvio: "Nuevo Envío",
     configuracoes: "Configuraciones",
     sair: "Cerrar Sesión",
+    confirmLogoutTitle: "¿Desea salir?",
+    confirmLogoutMessage: "¿Está seguro de que desea cerrar sesión?",
+    confirmLogoutButton: "Cerrar sesión",
+    sessionExpiredMessage:
+      "Su sesión ha expirado. Inicie sesión nuevamente para continuar.",
 
     // Accessibility
     collapseMenu: "Contraer menú",
@@ -1151,6 +1174,10 @@ export const translations = {
     finish: "Finalizar",
     selectClient: "Seleccione un cliente",
     selectOperator: "Seleccione un operador",
+    selectTeamMember: "Seleccione un miembro del equipo",
+    teamMember: "Responsable en la empresa",
+    companyAndTeamMember: "Empresa y responsable",
+    clientAndOperator: "Cliente y operador",
     pleaseSelectValidClient: "Por favor, seleccione un cliente válido.",
 
     // Messages

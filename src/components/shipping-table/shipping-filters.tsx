@@ -1,5 +1,6 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { Calendar, Filter, X, ChevronDown } from 'lucide-react';
+import { STATUS_LABELS } from '../../constants/statusOptions';
 import { useAuth } from '../../context/auth-context';
 import { useLanguage } from '../../context/language-context';
 import './shipping-filters.css';
@@ -8,6 +9,7 @@ export interface FilterOptions {
     dateFrom: string;
     dateTo: string;
     month: string;
+    status: string;
     sortBy: 'recent' | 'old' | 'etd' | 'eta' | 'client';
     sortOrder: 'asc' | 'desc';
     searchTerm: string;
@@ -83,7 +85,8 @@ const ShippingFilters: React.FC<ShippingFiltersProps> = ({
             filters.dateFrom ||
             filters.dateTo ||
             filters.month ||
-            filters.searchTerm || // Busca disponível para todos
+            filters.status ||
+            filters.searchTerm ||
             filters.sortBy !== 'recent'
         );
     };
@@ -92,7 +95,8 @@ const ShippingFilters: React.FC<ShippingFiltersProps> = ({
         let count = 0;
         if (filters.dateFrom || filters.dateTo) count++;
         if (filters.month) count++;
-        if (filters.searchTerm) count++; // Busca disponível para todos
+        if (filters.status) count++;
+        if (filters.searchTerm) count++;
         if (filters.sortBy !== 'recent') count++;
         return count;
     };
@@ -174,6 +178,22 @@ const ShippingFilters: React.FC<ShippingFiltersProps> = ({
                         placeholder={isAdmin() ? translations.searchPlaceholderAdmin : translations.searchPlaceholderClient}
                         className="search-input"
                     />
+                </div>
+
+                <div className="filter-group status-group">
+                    <select
+                        value={filters.status}
+                        onChange={(e) => handleInputChange('status', e.target.value)}
+                        className="status-select"
+                        aria-label={translations.status}
+                    >
+                        <option value="">{translations.allStatuses}</option>
+                        {Object.entries(STATUS_LABELS).map(([value, label]) => (
+                            <option key={value} value={value}>
+                                {label}
+                            </option>
+                        ))}
+                    </select>
                 </div>
 
                 <div className="filter-summary">

@@ -55,9 +55,19 @@
   border: 1px solid rgba(36, 212, 160, 0.3);
 }
 
-.filter-tag::before {
-  content: "✓";
-  font-size: 10px;
+.filter-tag--dismissible {
+  cursor: pointer;
+  border: none;
+  font-family: inherit;
+  transition: background 0.15s ease;
+}
+
+.filter-tag--dismissible:hover {
+  background: rgba(36, 212, 160, 0.2);
+}
+
+.filter-tag--dismissible::before {
+  content: none;
 }
 
 .excel-controls {
