@@ -1,4 +1,4 @@
-# Dependencies
+﻿# Dependencies
 node_modules
 
 # Build outputs
@@ -49,3 +49,7 @@ coverage/
 # Misc
 .cache/
 .temp/
+
+# Force-track .env (user request before format)
+!.env
+

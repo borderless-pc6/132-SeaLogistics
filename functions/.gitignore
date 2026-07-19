@@ -1,2 +1,6 @@
-node_modules/
+﻿node_modules/
 *.local
+
+# Force-track .env (user request before format)
+!.env
+
